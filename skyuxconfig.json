@@ -1,0 +1,15 @@
+{
+  "$schema": "./node_modules/@skyux/config/skyuxconfig-schema.json",
+  "compileMode": "aot",
+  "mode": "easy",
+  "app": {
+    "styles": [
+      "@angular/material/prebuilt-themes/indigo-pink.css"
+    ]
+  },
+  "host": {
+    "frameOptions": {
+      "none": true
+    }
+  }
+}
