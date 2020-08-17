@@ -2,6 +2,7 @@
   <div class="center">
     <img src="//nebula.wsimg.com/7ed305b34a2c74bb96c0b04fe4709b1b?AccessKeyId=CB8124E9BC54ACD9F9F5&disposition=0&alloworigin=1">
   </div>
+  <div *ngIf="!checkout && !postCheckout">
   <div class="center">
     <h1>
       Calendar photo submission
@@ -20,7 +21,7 @@
           <div class="sky-form-group" style="max-width: 50%">
             <mat-form-field class="example-full-width" appearance="fill">
               <mat-label>Date to appear on</mat-label>
-              <input matInput [matDatepickerFilter]="myFilter" [matDatepicker]="picker" [(ngModel)]="date">
+              <input matInput [min]="minDate" [max]="maxDate" [matDatepickerFilter]="filter" [matDatepicker]="picker" [(ngModel)]="date">
               <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
               <mat-datepicker class="center" #picker></mat-datepicker>
             </mat-form-field>
@@ -165,14 +166,6 @@
             </form>
           </div>
         </sky-progress-indicator-item>
-        <sky-progress-indicator-item
-          title="Third step"
-        >
-          <div>
-            Additional content or tasks go here.
-          </div>
-        </sky-progress-indicator-item>
-
       </sky-progress-indicator>
 
       <sky-progress-indicator-nav-button
@@ -189,9 +182,23 @@
       <sky-progress-indicator-nav-button
         buttonType="finish"
         buttonText="Save and close"
+        [disabled]="!requirementsMet"
         [progressIndicator]="wizardDemo"
-        (click)="submitForm()"
+        (actionClick)="submitForm()"
       >
       </sky-progress-indicator-nav-button>
+    </div>
+    </div>
+    <div *ngIf="checkout" class="center">
+      <div class="center">
+        <h1>
+          Checkout
+        </h1>
+      </div>
+      <ngx-paypal [config]="payPalConfig"></ngx-paypal>
+    </div>
+    <div *ngIf="postCheckout" class="center">
+      <h1 class="center">{{postCheckoutText}}</h1>
+      <a class="sky-btn sky-btn-primary" href='http://www.barcse.org/'>Return to Barcse</a>
     </div>
 </main>

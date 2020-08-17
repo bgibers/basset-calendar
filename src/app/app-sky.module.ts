@@ -8,7 +8,8 @@ import {
 
 import {
   SkyAlertModule,
-  SkyKeyInfoModule
+  SkyKeyInfoModule,
+  SkyWaitModule
 } from '@skyux/indicators';
 
 import {
@@ -23,10 +24,14 @@ import { MatDatepickerModule } from '@angular/material/datepicker';
 import { MatNativeDateModule } from '@angular/material/core';
 import { MatFormFieldModule} from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { BrowserAnimationsModule} from '@angular/platform-browser/animations'
+import { BrowserAnimationsModule} from '@angular/platform-browser/animations';
 import {MatIconModule} from '@angular/material/icon';
 import { SkyProgressIndicatorModule } from '@skyux/progress-indicator';
 import { SkyModalModule } from '@skyux/modals';
+import {HttpClientModule} from '@angular/common/http';
+import { NgxPayPalModule } from 'ngx-paypal';
+import { HttpService } from './services/http-service.service';
+import { NgxEditorModule} from 'ngx-editor';
 
 @NgModule({
   exports: [
@@ -43,7 +48,10 @@ import { SkyModalModule } from '@skyux/modals';
     MatIconModule,
     SkyProgressIndicatorModule,
     SkyModalModule,
-    SkyFileAttachmentsModule
+    SkyFileAttachmentsModule,
+    SkyWaitModule,
+    NgxPayPalModule,
+    NgxEditorModule
   ],
   imports: [
     MatDatepickerModule,
@@ -51,7 +59,10 @@ import { SkyModalModule } from '@skyux/modals';
     MatFormFieldModule,
     MatInputModule,
     BrowserAnimationsModule,
-    MatIconModule
+    MatIconModule,
+    HttpClientModule,
+    NgxPayPalModule,
+    NgxEditorModule
     ],
     providers: [
       MatDatepickerModule,
@@ -59,7 +70,8 @@ import { SkyModalModule } from '@skyux/modals';
       MatFormFieldModule,
       MatInputModule,
       BrowserAnimationsModule,
-      MatIconModule
+      MatIconModule,
+      HttpService
     ]
 })
 export class AppSkyModule { }

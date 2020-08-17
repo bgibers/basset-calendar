@@ -3,6 +3,7 @@
   "compileMode": "aot",
   "mode": "easy",
   "app": {
+    "base": "/",
     "styles": [
       "@angular/material/prebuilt-themes/indigo-pink.css"
     ]
