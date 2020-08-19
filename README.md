@@ -1,2 +1,2 @@
-# skyux-sdk-template
-Template for SKY UX applications created by the SKY UX CLI
+# Basset Calendar 
+A calendar created as part of some volunteer work. You can go to https://www.barcsebasset-a-daycalendar.org/ to see a live working example. The SPA is used to purchase a calendar. A user also reserves a date for their dogs image to be uploaded onto the cal. The workflow involves picking a date (that hasn't been selected yet), giving some purchaser info, dog info, uploading an image of the dog, and finally purchasing with paypal. Upon successful payment, the files are uploaded to the server. The backend code is also uploaded here, to see what is happening on the other end. 
