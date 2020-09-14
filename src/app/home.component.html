@@ -34,7 +34,7 @@
             <form [formGroup]="dogForm">
               <div class="sky-form-group" style="max-width: 50%">
                 <label for="dog" class="sky-control-label sky-control-label-required">
-                  Doggo(s) name(s)
+                  Dog(s) name(s)
                 </label>
                 <input class="sky-form-control" id="dog" type="text"  formControlName="dogName" required>
               </div>
@@ -52,32 +52,19 @@
               </div>
             </form>
             <h3>
-              Select one or multiple images for your calendar entry. Multiple photos will appear in the form of a collage.
+              Select an image of your dog(s) to appear on your calendar submission.
             </h3>
             <div style="width: 60%; margin-left: auto; margin-right: auto;">
-              <sky-file-drop
-                (filesChanged)="filesUpdated($event)"
-                (linkChanged)="linkAdded($event)"
-                [maxFileSize]="maxFileSize"
-                [validateFn]="validateFile"
-                [allowLinks]="false"
-                [acceptedTypes]="acceptedTypes">
-              </sky-file-drop>
-
-              <sky-alert
-                [alertType]="'danger'"
-                [closeable]="true"
-                *ngIf="rejectedFiles.length > 0">
-                The file <strong>{{rejectedFiles[rejectedFiles.length - 1].file.name}}</strong> is invalid.
-                Reason: {{rejectedFiles[rejectedFiles.length - 1].errorType}} violation.
-                Error param: {{rejectedFiles[rejectedFiles.length - 1].errorParam}}
-              </sky-alert>
-
-              <div *ngFor="let file of allItems">
-                <sky-file-item
-                  [fileItem]="file"
-                  (deleteFile)="deleteFile($event)">
-                </sky-file-item>
+              <sky-file-attachment [(ngModel)]="fileValue" [acceptedTypes]="acceptedTypes" [validateFn]="validateFile" [maxFileSize]="maxFileSize" (filesChanged)="filesUpdated($event)" #file="ngModel">
+                <sky-file-attachment-label>
+                  Image of dog
+                </sky-file-attachment-label>
+              </sky-file-attachment>
+              <div *ngIf="file?.invalid && file?.dirty" class="sky-error-label">
+                Attach a file.
+              </div>
+              <div *ngIf="templateUploadError" class="sky-error-label">
+                {{templateUploadError}}
               </div>
             </div>
           </div>

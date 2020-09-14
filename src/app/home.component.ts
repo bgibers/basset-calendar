@@ -4,14 +4,14 @@ import {
 import { FormGroup, FormControl, Validators } from '@angular/forms';
 import { SkyProgressIndicatorChange } from '@skyux/progress-indicator';
 import {
-  SkyFileDropChange,
   SkyFileItem,
-  SkyFileLink
+  SkyFileAttachmentChange
 } from '@skyux/forms';
 import { HttpService } from './services/http-service.service';
 import { SkyWaitService } from '@skyux/indicators';
 import { take } from 'rxjs/operators';
 import { IPayPalConfig, ICreateOrderRequest } from 'ngx-paypal';
+import { HttpErrorResponse } from '@angular/common/http';
 
 @Component({
   selector: 'my-home',
@@ -27,7 +27,7 @@ export class HomeComponent implements OnInit {
       case 0:
         return this.date !== undefined;
       case 1:
-        return this.dogForm.valid && this.filesToUpload.length > 0;
+        return this.dogForm.valid && this.fileValue !== undefined;
       case 2:
         return this.ownerForm.valid;
       default:
@@ -41,10 +41,8 @@ export class HomeComponent implements OnInit {
   public minDate = new Date();
   public maxDate = new Date();
   public activeIndex = 0;
-  public filesToUpload: SkyFileItem[];
-  public allItems: (SkyFileItem | SkyFileLink)[];
-  public linksToUpload: SkyFileLink[];
-  public rejectedFiles: SkyFileItem[];
+  public fileValue: SkyFileItem;
+  public templateUploadError: string;
   public maxFileSize: number = 4000000;
   public acceptedTypes: string = 'image/png,image/jpeg';
   public datesTaken: {[key: string]: string[]; } = {};
@@ -52,18 +50,15 @@ export class HomeComponent implements OnInit {
   public payPalConfig: IPayPalConfig;
   public checkout = false;
   public postCheckout = false;
+  public numCals: number;
   constructor(public httpService: HttpService, public waitSvc: SkyWaitService) {
-    this.minDate = new Date(this.currentYear + 1, 0, 1);
-    this.maxDate = new Date(this.currentYear + 1, 11, 31);
-
-    this.filesToUpload = [];
-    this.rejectedFiles = [];
-    this.allItems = [];
-    this.linksToUpload = [];
+    this.minDate = new Date(this.currentYear + 2, 0, 1);
+    this.maxDate = new Date(this.currentYear + 2, 11, 31);
   }
 
   public ngOnInit(): void {
     this.waitSvc.beginBlockingPageWait();
+    this.fileValue = undefined;
     const ownerName = new FormControl('', Validators.required);
     const dogName = new FormControl('', Validators.required);
     const isRescue = new FormControl(false, Validators.required);
@@ -105,72 +100,63 @@ export class HomeComponent implements OnInit {
   }
 
   public updateIndex(changes: SkyProgressIndicatorChange): void {
-    this.activeIndex = changes.activeIndex;
-  }
+    this.activeIndex = changes.activeIndex;  }
 
-  public filesUpdated(result: SkyFileDropChange) {
-    this.filesToUpload = this.filesToUpload.concat(result.files);
-    console.log(this.filesToUpload);
+  public filesUpdated(result: SkyFileAttachmentChange): void {
+    const file = result.file;
 
-    this.rejectedFiles = this.rejectedFiles.concat(result.rejectedFiles);
-    this.allItems = this.allItems.concat(result.files);
-  }
+    if (file && file.errorType) {
+      this.fileValue = undefined;
+      this.templateUploadError = this.getErrorMessage(file.errorType, file.errorParam);
 
-  public linkAdded(result: SkyFileLink) {
-    this.linksToUpload = this.linksToUpload.concat(result);
-    this.allItems = this.allItems.concat(result);
-  }
-
-  public validateFile(file: SkyFileItem) {
-    if (file.file.name.indexOf('a') === 0) {
-      return 'You may not upload a file that begins with the letter "a."';
+    } else {
+      this.fileValue = file;
+      this.templateUploadError = undefined;
     }
   }
 
-  public deleteFile(file: SkyFileItem | SkyFileLink) {
-    this.removeFromArray(this.allItems, file);
-    this.removeFromArray(this.filesToUpload, file);
-    this.removeFromArray(this.linksToUpload, file);
+  public validateFile(file: SkyFileItem) {
+
   }
 
   public submitForm() {
     this.checkout = true;
   }
 
-  private removeFromArray(items: any[], obj: SkyFileItem | SkyFileLink) {
-    if (items) {
-      const index = items.indexOf(obj);
-
-      if (index !== -1) {
-        items.splice(index, 1);
-      }
+  private getErrorMessage(errorType: string, errorParam: string): string {
+    if (errorType === 'fileType') {
+      return `Please upload a file of type ${errorParam}.`;
+    } else if (errorType === 'maxFileSize') {
+      return `Please upload a file smaller than ${errorParam} KB.`;
+    } else {
+      return errorParam;
     }
   }
 
   private initConfig(): void {
     this.payPalConfig = {
         currency: 'USD',
-        clientId: 'sb',
+        clientId: 'AeVrUujAwn-me2pUdRlPANmADsETUI9qAZYkd9WIBvovYyoPTH2SnCG_DA8qyIefRBJg2mBdOZpDuGSV',
         createOrderOnClient: (data) => <ICreateOrderRequest> {
             intent: 'CAPTURE',
             purchase_units: [{
                 amount: {
                     currency_code: 'USD',
-                    value: '9.99',
+                    value: '29.99',
                     breakdown: {
                         item_total: {
                             currency_code: 'USD',
-                            value: '9.99'
+                            value: '29.99'
                         }
                     }
                 },
                 items: [{
-                    name: 'BaRCSE calendar',
+                    name: `BaRCSE calendar ${this.date}`,
                     quantity: '1',
                     category: 'PHYSICAL_GOODS',
                     unit_amount: {
                         currency_code: 'USD',
-                        value: '9.99'
+                        value: '29.99'
                     }
                 }]
             }]
@@ -192,11 +178,20 @@ export class HomeComponent implements OnInit {
         onClientAuthorization: (data) => {
           this.waitSvc.beginBlockingPageWait();
           console.log('onClientAuthorization - you should probably inform your server about completed transaction at this point', data);
-          this.httpService.UploadToServer(this.filesToUpload[0].file, this.ownerForm, this.dogForm, this.date);
-          this.waitSvc.endBlockingPageWait();
-          this.postCheckout = true;
-          this.checkout = false;
-          this.postCheckoutText = 'Thank you for your order!';
+          this.httpService.UploadToServer(this.fileValue.file, this.ownerForm, this.dogForm, this.date).pipe(take(1)).subscribe(() => {
+            this.postCheckout = true;
+            this.checkout = false;
+            this.postCheckoutText = 'Thank you for your order!';
+          }, (err: HttpErrorResponse) => {
+            if (err.status === 200) {
+              this.postCheckout = true;
+              this.checkout = false;
+              this.postCheckoutText = 'Thank you for your order!';
+              this.waitSvc.endBlockingPageWait();
+            }
+          }, () => {
+            this.waitSvc.endBlockingPageWait();
+          });
         },
         onCancel: (data, actions) => {
             console.log('OnCancel', data, actions);

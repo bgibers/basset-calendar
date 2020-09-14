@@ -1,7 +1,7 @@
 import {HttpClient, HttpParams} from '@angular/common/http';
 import * as _ from 'lodash';
 import { Injectable } from '@angular/core';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, Observable } from 'rxjs';
 import { FormGroup } from '@angular/forms';
 
 @Injectable()
@@ -29,7 +29,7 @@ export class HttpService {
     return new BehaviorSubject(this.datesTaken);
   }
 
-  public UploadToServer(file: File, ownerForm: FormGroup, petForm: FormGroup, date: Date) {
+  public UploadToServer(file: File, ownerForm: FormGroup, petForm: FormGroup, date: Date): Observable<Object> {
     let formData = new FormData();
     formData.append('ownerName', ownerForm.controls.ownerName.value);
     formData.append('city', ownerForm.controls.city.value);
@@ -42,17 +42,6 @@ export class HttpService {
 
     const params = new HttpParams({fromString: `month=${this.months[date.getMonth()]}&year=${date.getFullYear()}&date=${date.getDate()}`});
 
-    this.httpClient.post('https://www.barcsebasset-a-daycalendar.org/fs/upload', formData, {params})
-    .subscribe(
-        (val) => {
-            console.log('POST call successful value returned in body',
-                        val);
-        },
-        response => {
-            console.log('POST call in error', response);
-        },
-        () => {
-            console.log('The POST observable is now completed.');
-        });
+    return this.httpClient.post('https://www.barcsebasset-a-daycalendar.org/fs/upload', formData, {params});
   }
 }
