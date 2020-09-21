@@ -52,8 +52,8 @@ export class HomeComponent implements OnInit {
   public postCheckout = false;
   public numCals: number;
   constructor(public httpService: HttpService, public waitSvc: SkyWaitService) {
-    this.minDate = new Date(this.currentYear + 2, 0, 1);
-    this.maxDate = new Date(this.currentYear + 2, 11, 31);
+    this.minDate = new Date(this.currentYear + 1, 0, 1);
+    this.maxDate = new Date(this.currentYear + 1, 11, 31);
   }
 
   public ngOnInit(): void {

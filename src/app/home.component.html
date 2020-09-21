@@ -21,9 +21,9 @@
           <div class="sky-form-group" style="max-width: 50%">
             <mat-form-field class="example-full-width" appearance="fill">
               <mat-label>Date to appear on</mat-label>
-              <input matInput [min]="minDate" [max]="maxDate" [matDatepickerFilter]="filter" [matDatepicker]="picker" [(ngModel)]="date">
+              <input disabled matInput [min]="minDate" [max]="maxDate" [matDatepickerFilter]="filter" [matDatepicker]="picker" [(ngModel)]="date">
               <mat-datepicker-toggle matSuffix [for]="picker"></mat-datepicker-toggle>
-              <mat-datepicker class="center" #picker></mat-datepicker>
+              <mat-datepicker disabled="false" class="center" #picker></mat-datepicker>
             </mat-form-field>
           </div>
         </sky-progress-indicator-item>
