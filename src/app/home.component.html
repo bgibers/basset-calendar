@@ -176,7 +176,7 @@
       </sky-progress-indicator-nav-button>
     </div>
     </div>
-    <div *ngIf="checkout" class="center">
+    <div *ngIf="checkout && !isFreeClaim" class="center">
       <div class="center">
         <h1>
           Checkout
@@ -186,6 +186,8 @@
     </div>
     <div *ngIf="postCheckout" class="center">
       <h1 class="center">{{postCheckoutText}}</h1>
-      <a class="sky-btn sky-btn-primary" href='http://www.barcse.org/'>Return to Barcse</a>
+      <h2 class="center" *ngIf="!isFreeClaim">Would you like to reserve a second calendar space, free of charge? :) </h2>
+      <div class="center" *ngIf="!isFreeClaim"><button class="sky-btn sky-btn-primary center" (click)="freeClaim()">Claim free space</button></div>
+      <div class="center"><a class="sky-btn sky-btn-primary center" href='http://www.barcse.org/'>Return to Barcse</a></div>
     </div>
 </main>

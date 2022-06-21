@@ -50,7 +50,11 @@ export class HomeComponent implements OnInit {
   public payPalConfig: IPayPalConfig;
   public checkout = false;
   public postCheckout = false;
+  public freeClaimEligible = true;
+  public isFreeClaim = false;
+
   public numCals: number;
+
   constructor(public httpService: HttpService, public waitSvc: SkyWaitService) {
     this.minDate = new Date(this.currentYear + 1, 0, 1);
     this.maxDate = new Date(this.currentYear + 1, 11, 31);
@@ -100,7 +104,8 @@ export class HomeComponent implements OnInit {
   }
 
   public updateIndex(changes: SkyProgressIndicatorChange): void {
-    this.activeIndex = changes.activeIndex;  }
+    this.activeIndex = changes.activeIndex;
+  }
 
   public filesUpdated(result: SkyFileAttachmentChange): void {
     const file = result.file;
@@ -120,8 +125,36 @@ export class HomeComponent implements OnInit {
   }
 
   public submitForm() {
-    this.checkout = true;
+    if (this.isFreeClaim) {
+      this.freeClaimUpload();
+    } else {
+      this.checkout = true;
+    }
   }
+
+  public freeClaimUpload() {
+      this.httpService.UploadToServer(this.fileValue.file, this.ownerForm, this.dogForm, this.date).pipe(take(1)).subscribe(() => {
+          this.postCheckout = true;
+          this.freeClaimEligible = false;
+          this.postCheckoutText = 'Thank you for your order!';
+      }, (err: HttpErrorResponse) => {
+          if (err.status === 200) {
+          this.postCheckout = true;
+          this.postCheckoutText = 'Thank you for your order!';
+          this.waitSvc.endBlockingPageWait();
+        }
+    }, () => {
+      this.waitSvc.endBlockingPageWait();
+    });
+}
+
+public freeClaim() {
+  this.isFreeClaim = true;
+  this.postCheckout = false;
+  this.checkout = false;
+  this.activeIndex = 0;
+  this.ngOnInit();
+}
 
   private getErrorMessage(errorType: string, errorParam: string): string {
     if (errorType === 'fileType') {
