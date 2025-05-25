@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background-color: white;
+}
+
+.center {
+  text-align: center;
+  margin: 0 auto;
+}
+
+/* Custom styles for the calendar app */
+.progress-indicator {
+  @apply flex justify-center items-center space-x-4 mb-8;
+}
+
+.progress-step {
+  @apply flex items-center;
+}
+
+.progress-circle {
+  @apply w-10 h-10 rounded-full flex items-center justify-center font-semibold;
+}
+
+.progress-circle.active {
+  @apply bg-red-600 text-white;
+}
+
+.progress-circle.completed {
+  @apply bg-green-600 text-white;
+}
+
+.progress-circle.inactive {
+  @apply bg-gray-300 text-gray-600;
+}
+
+.progress-line {
+  @apply w-24 h-1 bg-gray-300;
+}
+
+.progress-line.completed {
+  @apply bg-green-600;
+}

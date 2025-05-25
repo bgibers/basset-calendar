@@ -1,32 +1,50 @@
-# Logs
-logs
-*.log
-npm-debug.log*
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# Coverage directory used by tools like istanbul
-coverage
+# dependencies
+/node_modules
+/.pnp
+.pnp.js
 
-# Dependency directories
-node_modules
-jspm_packages
-yarn.lock
+# testing
+/coverage
 
-# Optional npm cache directory
-.npm
+# next.js
+/.next/
+/out/
 
-# Optional REPL history
-.node_repl_history
+# production
+/build
 
-# SKY UX temp directory
-.skyuxtmp
-.skypageslocales
-.skypagestmp
-
-# SKY UX build directory
-dist
-
-# OS specific files
+# misc
 .DS_Store
+*.pem
 
-# IntelliJ files
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# local env files
+.env*.local
+.env
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# IDEs
 .idea
+.vscode
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+
+# Old build artifacts
+/dist
+/temp
+/tmp

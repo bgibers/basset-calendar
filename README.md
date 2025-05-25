@@ -1,2 +1,20 @@
-# Basset Calendar 
-A calendar created as part of some volunteer work. You can go to https://www.barcsebasset-a-daycalendar.org/ to see a live working example. The SPA is used to purchase a calendar. A user also reserves a date for their dogs image to be uploaded onto the cal. The workflow involves picking a date (that hasn't been selected yet), giving some purchaser info, dog info, uploading an image of the dog, and finally purchasing with paypal. Upon successful payment, the files are uploaded to the server. The backend code is also uploaded here, to see what is happening on the other end. 
+# BaRCSE Basset Calendar
+
+This is a Next.js application for submitting basset photos to the BaRCSE calendar.
+
+## Getting Started
+Set `NEXT_PUBLIC_SANDBOX=true` for testing
+
+First, install the dependencies:
+
+```bash
+pnpm install
+```
+
+Then, run the development server:
+
+```bash
+pnpm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000)
