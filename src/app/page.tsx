@@ -44,7 +44,7 @@ export default function Home() {
   const maxDate = new Date(currentYear + 1, 11, 31)
 
   const PAYPAL_PRODUCTION_CLIENT_ID = "AeVrUujAwn-me2pUdRlPANmADsETUI9qAZYkd9WIBvovYyoPTH2SnCG_DA8qyIefRBJg2mBdOZpDuGSV"
-  const PAYPAL_SANDBOX_CLIENT_ID = "sb"
+  const PAYPAL_SANDBOX_CLIENT_ID = "AWIRhPJA4dZ-YEcXmgBNJxTlWLZy06zPw3rqhgboXPC5Gc-lOCt_uvktXPyLoQbb-jcNOaHt0ITWTinV"
 
   const paypalClientId = isSandbox ? PAYPAL_SANDBOX_CLIENT_ID : PAYPAL_PRODUCTION_CLIENT_ID
 
@@ -167,6 +167,13 @@ export default function Home() {
       const formData = {
         ...ownerForm.getValues(),
         ...dogForm.getValues()
+      }
+
+      if (isSandbox) {
+        setPostCheckout(true)
+        setCheckout(false)
+        setPostCheckoutText('Thank you for your order!')
+        return
       }
 
       if (fileValue && selectedDate) {
@@ -533,7 +540,17 @@ export default function Home() {
                   })
                 }}
                 onApprove={async (data, actions) => {
-                  await handlePaymentSuccess()
+                  // Capture the order first
+                  const details = await actions.order!.capture()
+
+                  // Only proceed if the capture was successful
+                  if (details.status === 'COMPLETED') {
+                    await handlePaymentSuccess()
+                  } else {
+                    console.error('Payment capture failed:', details)
+                    setCheckout(false)
+                    alert('Payment could not be completed. Please try again.')
+                  }
                 }}
                 onCancel={() => {
                   setCheckout(false)
