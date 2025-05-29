@@ -43,7 +43,7 @@ export default function Home() {
   const minDate = new Date(currentYear + 1, 0, 1)
   const maxDate = new Date(currentYear + 1, 11, 31)
 
-  const PAYPAL_PRODUCTION_CLIENT_ID = process.env.NEXT_PUBLIC_PAYPAL_CLIENT_ID || "AeVrUujAwn-me2pUdRlPANmADsETUI9qAZYkd9WIBvovYyoPTH2SnCG_DA8qyIefRBJg2mBdOZpDuGSV"
+  const PAYPAL_PRODUCTION_CLIENT_ID = "AeVrUujAwn-me2pUdRlPANmADsETUI9qAZYkd9WIBvovYyoPTH2SnCG_DA8qyIefRBJg2mBdOZpDuGSV"
   const PAYPAL_SANDBOX_CLIENT_ID = "sb"
 
   const paypalClientId = isSandbox ? PAYPAL_SANDBOX_CLIENT_ID : PAYPAL_PRODUCTION_CLIENT_ID
@@ -215,6 +215,7 @@ export default function Home() {
       currency: "USD",
       intent: "capture",
       components: "buttons",
+      commit: true,
       ...(isSandbox && {
         buyerCountry: "US",
         debug: true
@@ -486,11 +487,16 @@ export default function Home() {
             <h1 className="text-3xl font-bold mb-8">Checkout</h1>
             <div className="max-w-md mx-auto">
               <PayPalButtons
+                style={{
+                  label: 'paypal',
+                  layout: 'vertical'
+                }}
                 createOrder={(data, actions) => {
                   const totalPrice = calculateTotalPrice()
                   const items = [{
                     name: `BaRCSE calendar ${selectedDate?.toLocaleDateString()}`,
                     quantity: '1',
+                    category: 'PHYSICAL_GOODS' as const,
                     unit_amount: {
                       currency_code: 'USD',
                       value: '31.99'
@@ -501,6 +507,7 @@ export default function Home() {
                     items.push({
                       name: 'Calendar Stand',
                       quantity: '1',
+                      category: 'PHYSICAL_GOODS' as const,
                       unit_amount: {
                         currency_code: 'USD',
                         value: '8.00'
