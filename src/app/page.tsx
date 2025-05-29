@@ -172,6 +172,7 @@ export default function Home() {
       if (fileValue && selectedDate) {
         await httpService.uploadToServer(fileValue, formData, selectedDate)
         await loadDatesTaken()
+        await httpService.sendEmail(formData, selectedDate)
         setPostCheckout(true)
         setCheckout(false)
         setPostCheckoutText('Thank you for your order!')

@@ -43,6 +43,35 @@ export const httpService = {
     return datesTaken
   },
 
+  async sendEmail(formData: FormData, date: Date): Promise<void> {
+    try {
+      const response = await fetch('/api/send-email', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ownerName: formData.ownerName,
+          city: formData.city,
+          state: formData.state,
+          email: formData.email,
+          dogName: formData.dogName,
+          isRescue: formData.isRescue,
+          isCalendarStand: formData.isCalendarStand,
+          caption: formData.caption,
+          date: date.toISOString()
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to send email')
+      }
+    } catch (error) {
+      console.error('Error sending email:', error)
+      throw error
+    }
+  },
+
   async uploadToServer(
     file: File,
     formData: FormData,
@@ -56,6 +85,7 @@ export const httpService = {
     uploadData.append('email', formData.email)
     uploadData.append('dogName', formData.dogName)
     uploadData.append('isRescue', formData.isRescue.toString())
+    uploadData.append('needCalendarStand', formData.isCalendarStand?.toString() ?? 'false')
     uploadData.append('caption', formData.caption)
     uploadData.append('image', file)
 
