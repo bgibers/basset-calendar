@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
         `Email: ${formData.email}\n` +
         `Dog Name: ${formData.dogName}\n` +
         `Is Rescue: ${formData.isRescue}\n` +
-        `Need Calendar Stand: ${formData.isCalendarStand}\n` +
+        `Calendar Stand: ${formData.standOptionLabel ?? formData.standOption}\n` +
         `Caption: ${formData.caption}\n`
     }
 

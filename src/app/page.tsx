@@ -1,5 +1,7 @@
 'use client'
 
+import standBlackImg from '@/assets/stand-black.jpg'
+import standClearImg from '@/assets/stand-clear.jpg'
 import { FileAttachment } from '@/components/FileAttachment'
 import { ProgressIndicator } from '@/components/ProgressIndicator'
 import { DatesTaken, httpService } from '@/lib/http-service'
@@ -15,12 +17,14 @@ interface DogFormData {
   caption: string
 }
 
+type StandOption = '' | 'clear' | 'black' | 'have'
+
 interface OwnerFormData {
   ownerName: string
   city: string
   state: string
   email: string
-  isCalendarStand: boolean
+  standOption: StandOption
 }
 
 export default function Home() {
@@ -62,7 +66,7 @@ export default function Home() {
       city: '',
       state: '',
       email: '',
-      isCalendarStand: false
+      standOption: ''
     }
   })
 
@@ -111,7 +115,8 @@ export default function Home() {
           ownerValues.city !== '' &&
           ownerValues.state !== '' &&
           ownerValues.email !== '' &&
-          /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(ownerValues.email)
+          /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(ownerValues.email) &&
+          ownerValues.standOption !== ''
       default:
         return false
     }
@@ -125,8 +130,9 @@ export default function Home() {
   const calculateTotalPrice = (): string => {
     const basePrice = 31.99
     const standPrice = 8.00
-    const isCalendarStand = ownerForm.getValues('isCalendarStand')
-    return (isCalendarStand ? basePrice + standPrice : basePrice).toFixed(2)
+    const standOption = ownerForm.getValues('standOption')
+    const buyingStand = standOption === 'clear' || standOption === 'black'
+    return (buyingStand ? basePrice + standPrice : basePrice).toFixed(2)
   }
 
   const handleSubmit = async () => {
@@ -436,15 +442,60 @@ export default function Home() {
                     />
                   </div>
 
-                  <div className="flex items-center">
-                    <input
-                      {...ownerForm.register('isCalendarStand')}
-                      type="checkbox"
-                      className="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded"
-                    />
-                    <label className="ml-2 block text-sm text-gray-700">
-                      Add Calendar Stand (+$8) - not needed if you have a 4&quot; by 6&quot; stand from a previous Daily Drool calendar
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Calendar stand <span className="text-red-500">*</span>
                     </label>
+                    <p className="text-xs text-gray-500 mb-3">
+                      The calendar uses a 4&quot; by 6&quot; stand. If you already have one from a previous Daily Drool calendar, no need to order another. Otherwise, choose the style you&apos;d like.
+                    </p>
+                    <div className="space-y-3">
+                      <label className="flex items-start p-3 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50">
+                        <input
+                          {...ownerForm.register('standOption', { required: true })}
+                          type="radio"
+                          value="clear"
+                          className="mt-1 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300"
+                        />
+                        <img
+                          src={standClearImg.src}
+                          alt="Clear acrylic calendar stand"
+                          className="ml-3 h-20 w-20 object-contain"
+                        />
+                        <span className="ml-3 text-sm text-gray-700 self-center">
+                          Order a clear acrylic stand (+$8)
+                        </span>
+                      </label>
+
+                      <label className="flex items-start p-3 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50">
+                        <input
+                          {...ownerForm.register('standOption', { required: true })}
+                          type="radio"
+                          value="black"
+                          className="mt-1 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300"
+                        />
+                        <img
+                          src={standBlackImg.src}
+                          alt="Black calendar stand"
+                          className="ml-3 h-20 w-20 object-contain"
+                        />
+                        <span className="ml-3 text-sm text-gray-700 self-center">
+                          Order a black stand (+$8)
+                        </span>
+                      </label>
+
+                      <label className="flex items-start p-3 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50">
+                        <input
+                          {...ownerForm.register('standOption', { required: true })}
+                          type="radio"
+                          value="have"
+                          className="mt-1 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300"
+                        />
+                        <span className="ml-3 text-sm text-gray-700 self-center">
+                          I already have a stand
+                        </span>
+                      </label>
+                    </div>
                   </div>
                 </form>
               )}
@@ -510,9 +561,10 @@ export default function Home() {
                     }
                   }]
 
-                  if (ownerForm.getValues('isCalendarStand')) {
+                  const standOption = ownerForm.getValues('standOption')
+                  if (standOption === 'clear' || standOption === 'black') {
                     items.push({
-                      name: 'Calendar Stand',
+                      name: standOption === 'clear' ? 'Calendar Stand (clear acrylic)' : 'Calendar Stand (black)',
                       quantity: '1',
                       category: 'PHYSICAL_GOODS' as const,
                       unit_amount: {
