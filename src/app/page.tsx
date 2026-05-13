@@ -17,7 +17,7 @@ interface DogFormData {
   caption: string
 }
 
-type StandOption = '' | 'clear' | 'black' | 'have'
+type StandOption = '' | 'have-black' | 'have-clear' | 'order'
 
 interface OwnerFormData {
   ownerName: string
@@ -131,7 +131,7 @@ export default function Home() {
     const basePrice = 31.99
     const standPrice = 8.00
     const standOption = ownerForm.getValues('standOption')
-    const buyingStand = standOption === 'clear' || standOption === 'black'
+    const buyingStand = standOption === 'order'
     return (buyingStand ? basePrice + standPrice : basePrice).toFixed(2)
   }
 
@@ -447,14 +447,31 @@ export default function Home() {
                       Calendar stand <span className="text-red-500">*</span>
                     </label>
                     <p className="text-xs text-gray-500 mb-3">
-                      The calendar uses a 4&quot; by 6&quot; stand. If you already have one from a previous Daily Drool calendar, no need to order another. Otherwise, choose the style you&apos;d like.
+                      The calendar uses a 4&quot; by 6&quot; stand. The hole-punch locations are different for the black and clear stands, so please double-check which one you have before selecting.
                     </p>
                     <div className="space-y-3">
                       <label className="flex items-start p-3 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50">
                         <input
                           {...ownerForm.register('standOption', { required: true })}
                           type="radio"
-                          value="clear"
+                          value="have-black"
+                          className="mt-1 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300"
+                        />
+                        <img
+                          src={standBlackImg.src}
+                          alt="Black acrylic calendar stand"
+                          className="ml-3 h-20 w-20 object-contain"
+                        />
+                        <span className="ml-3 text-sm text-gray-700 self-center">
+                          I have a black acrylic stand
+                        </span>
+                      </label>
+
+                      <label className="flex items-start p-3 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50">
+                        <input
+                          {...ownerForm.register('standOption', { required: true })}
+                          type="radio"
+                          value="have-clear"
                           className="mt-1 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300"
                         />
                         <img
@@ -463,7 +480,7 @@ export default function Home() {
                           className="ml-3 h-20 w-20 object-contain"
                         />
                         <span className="ml-3 text-sm text-gray-700 self-center">
-                          Order a clear acrylic stand (+$8)
+                          I have a clear acrylic calendar stand
                         </span>
                       </label>
 
@@ -471,28 +488,11 @@ export default function Home() {
                         <input
                           {...ownerForm.register('standOption', { required: true })}
                           type="radio"
-                          value="black"
-                          className="mt-1 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300"
-                        />
-                        <img
-                          src={standBlackImg.src}
-                          alt="Black calendar stand"
-                          className="ml-3 h-20 w-20 object-contain"
-                        />
-                        <span className="ml-3 text-sm text-gray-700 self-center">
-                          Order a black stand (+$8)
-                        </span>
-                      </label>
-
-                      <label className="flex items-start p-3 border border-gray-300 rounded-md cursor-pointer hover:bg-gray-50">
-                        <input
-                          {...ownerForm.register('standOption', { required: true })}
-                          type="radio"
-                          value="have"
+                          value="order"
                           className="mt-1 h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300"
                         />
                         <span className="ml-3 text-sm text-gray-700 self-center">
-                          I already have a stand
+                          I need to order a stand (+$8)
                         </span>
                       </label>
                     </div>
@@ -562,9 +562,9 @@ export default function Home() {
                   }]
 
                   const standOption = ownerForm.getValues('standOption')
-                  if (standOption === 'clear' || standOption === 'black') {
+                  if (standOption === 'order') {
                     items.push({
-                      name: standOption === 'clear' ? 'Calendar Stand (clear acrylic)' : 'Calendar Stand (black)',
+                      name: 'Calendar Stand',
                       quantity: '1',
                       category: 'PHYSICAL_GOODS' as const,
                       unit_amount: {

@@ -12,14 +12,14 @@ export interface FormData {
   dogName: string
   isRescue: boolean
   caption: string
-  standOption: 'clear' | 'black' | 'have' | ''
+  standOption: 'have-black' | 'have-clear' | 'order' | ''
 }
 
 const STAND_OPTION_LABELS: Record<FormData['standOption'], string> = {
   '': 'Not specified',
-  clear: 'Ordering clear acrylic stand',
-  black: 'Ordering black stand',
-  have: 'Already has a stand'
+  'have-black': 'Already has a black acrylic stand',
+  'have-clear': 'Already has a clear acrylic stand',
+  order: 'Ordering a stand'
 }
 
 const API_BASE_URL = 'https://www.barcsebasset-a-daycalendar.org/fs'
@@ -93,7 +93,7 @@ export const httpService = {
     uploadData.append('email', formData.email)
     uploadData.append('dogName', formData.dogName)
     uploadData.append('isRescue', formData.isRescue.toString())
-    uploadData.append('needCalendarStand', (formData.standOption === 'clear' || formData.standOption === 'black').toString())
+    uploadData.append('needCalendarStand', (formData.standOption === 'order').toString())
     uploadData.append('standOption', formData.standOption)
     uploadData.append('caption', formData.caption)
     uploadData.append('image', file)
