@@ -116,7 +116,7 @@ export default function Home() {
           ownerValues.state !== '' &&
           ownerValues.email !== '' &&
           /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(ownerValues.email) &&
-          ownerValues.standOption !== ''
+          (isFreeClaim || ownerValues.standOption !== '')
       default:
         return false
     }
@@ -442,6 +442,7 @@ export default function Home() {
                     />
                   </div>
 
+                  {!isFreeClaim && (
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Calendar stand <span className="text-red-500">*</span>
@@ -497,6 +498,7 @@ export default function Home() {
                       </label>
                     </div>
                   </div>
+                  )}
                 </form>
               )}
             </div>
