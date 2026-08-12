@@ -20,8 +20,13 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
 
   let stand_option: unknown
   try {
-    const body = await request.json()
-    stand_option = (body as { stand_option?: unknown } | null)?.stand_option ?? null
+    const body: unknown = await request.json()
+    // Require the key explicitly: a body that omits it is a malformed request, not a
+    // request to clear the stand option (clearing must send an explicit null).
+    if (typeof body !== 'object' || body === null || !('stand_option' in body)) {
+      return NextResponse.json({ error: 'missing stand_option' }, { status: 400 })
+    }
+    stand_option = (body as { stand_option: unknown }).stand_option
   } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
@@ -37,8 +42,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
       .select()
       .maybeSingle()
     if (error) {
+      // PostgREST messages can name schema objects and constraints; log, don't return.
       console.error('[admin orders patch] update failed:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Could not update order' }, { status: 500 })
     }
     if (!data) return NextResponse.json({ error: 'not found' }, { status: 404 })
     return NextResponse.json({ order: data })

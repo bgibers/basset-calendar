@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Order, StandOption } from '@/lib/types'
 import { STAND_LABELS } from '@/lib/types'
 import {
@@ -13,6 +13,7 @@ import {
   FILTER_LABELS,
   type OrderFilter,
 } from '@/lib/order-flags'
+import { createLatestOnly } from '@/lib/latest-request'
 
 const FILTERS: OrderFilter[] = ['all', 'missing-stand', 'no-email', 'flagged']
 const YEARS = [2026, 2027, 2028]
@@ -24,30 +25,43 @@ export default function OrdersTable() {
   const [filter, setFilter] = useState<OrderFilter>('all')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [savingId, setSavingId] = useState<string | null>(null)
+  const [savingIds, setSavingIds] = useState<Set<string>>(() => new Set())
+
+  // Guards against a slow response for an earlier year resolving after a newer one and
+  // rendering the wrong year's rows: superseded loads are aborted and their results
+  // discarded. See src/lib/latest-request.ts (unit-tested).
+  const latest = useRef(createLatestOnly())
 
   const load = useCallback(async (targetYear: number) => {
     setLoading(true)
     setError('')
-    try {
-      const res = await fetch(`/api/admin/orders?year=${targetYear}`)
+    const result = await latest.current.run(async signal => {
+      const res = await fetch(`/api/admin/orders?year=${targetYear}`, { signal })
       if (!res.ok) {
         const body = await res.json().catch(() => null)
         throw new Error(body?.error ?? `Request failed (${res.status})`)
       }
-      const body = await res.json()
-      setOrders(Array.isArray(body.orders) ? body.orders : [])
-    } catch (err) {
+      return (await res.json()) as { orders?: unknown }
+    })
+    if (result.stale) return // a newer load owns the UI now, including `loading`
+    if (result.error) {
       setOrders([])
-      setError(err instanceof Error ? err.message : 'Could not load orders')
-    } finally {
-      setLoading(false)
+      setError(result.error instanceof Error ? result.error.message : 'Could not load orders')
+    } else {
+      setOrders(Array.isArray(result.value?.orders) ? (result.value!.orders as Order[]) : [])
     }
+    setLoading(false)
   }, [])
 
   useEffect(() => {
     void load(year)
   }, [load, year])
+
+  // Abort any request still in flight when the table unmounts.
+  useEffect(() => {
+    const controller = latest.current
+    return () => controller.abort()
+  }, [])
 
   const dupes = useMemo(() => duplicateDates(orders), [orders])
   const visible = useMemo(() => filterOrders(orders, filter), [orders, filter])
@@ -76,7 +90,7 @@ export default function OrdersTable() {
           : o,
       ),
     )
-    setSavingId(order.id)
+    setSavingIds(current => new Set(current).add(order.id))
     try {
       const res = await fetch(`/api/admin/orders/${order.id}`, {
         method: 'PATCH',
@@ -101,7 +115,12 @@ export default function OrdersTable() {
       )
       alert(`Could not save stand option: ${err instanceof Error ? err.message : 'unknown error'}`)
     } finally {
-      setSavingId(null)
+      // Per-row: clearing a shared slot would re-enable a different row still saving.
+      setSavingIds(current => {
+        const next = new Set(current)
+        next.delete(order.id)
+        return next
+      })
     }
   }
 
@@ -221,7 +240,7 @@ export default function OrdersTable() {
                     <td className="p-2 whitespace-nowrap">
                       <select
                         value={o.stand_option ?? ''}
-                        disabled={savingId === o.id}
+                        disabled={savingIds.has(o.id)}
                         onChange={e => void updateStand(o, e.target.value)}
                         className="border rounded p-1 disabled:opacity-50"
                       >

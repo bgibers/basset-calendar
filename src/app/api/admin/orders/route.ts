@@ -29,8 +29,9 @@ export async function GET(request: NextRequest) {
       .lte('calendar_date', `${year}-12-31`)
       .order('calendar_date')
     if (error) {
+      // PostgREST messages can name schema objects and constraints; log, don't return.
       console.error('[admin orders] query failed:', error)
-      return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ error: 'Could not load orders' }, { status: 500 })
     }
     return NextResponse.json({ orders: data ?? [] })
   } catch (err) {
