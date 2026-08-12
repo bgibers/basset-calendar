@@ -113,15 +113,19 @@ export async function sendStandBatch(
   const failures: { email: string; error: string }[] = []
   let sent = 0
 
-  for (let i = 0; i < orders.length; i++) {
-    const order = orders[i]
+  // The pause exists to space out *SMTP conversations*. A row skipped for a blank address
+  // never touched the server, so it must not earn the next row a wait.
+  let lastWasRealSend = false
+
+  for (const order of orders) {
     // `email <> ''` in SQL still lets `'   '` through. Report those instead of handing
     // whitespace to the SMTP server, so the admin sees the row and the counts line up.
     if ((order.email ?? '').trim() === '') {
       failures.push({ email: order.email ?? '', error: 'blank email address' })
       continue
     }
-    if (i > 0) await delay(SEND_DELAY_MS)
+    if (lastWasRealSend) await delay(SEND_DELAY_MS)
+    lastWasRealSend = true
     try {
       await mailer.sendMail({
         from,
@@ -180,6 +184,37 @@ export type CampaignOutcome =
   | 'failures'
   /** Work remains but a batch sent nothing — stop rather than spin. */
   | 'stalled'
+
+/**
+ * Remembers the campaign stamp across presses of the send button.
+ *
+ * A retry after a failed run must continue the *same* campaign — minting a fresh stamp
+ * would re-include everyone the failed run already reached, contradicting the "everyone
+ * already emailed is skipped" promise in the UI. Only a run that finishes cleanly clears
+ * the stamp, so the next press is a genuinely new campaign (the follow-up).
+ */
+export interface CampaignTracker {
+  /** The stamp to use for this press: the unfinished campaign's, or `nowIso`. */
+  current(nowIso: string): string
+  /** Record how the run ended; clears the stamp only on a complete run. */
+  settle(outcome: CampaignOutcome): void
+  /** The stamp still in flight, or null when the last campaign completed. */
+  pending(): string | null
+}
+
+export function createCampaignTracker(): CampaignTracker {
+  let stamp: string | null = null
+  return {
+    current(nowIso: string) {
+      stamp ??= nowIso
+      return stamp
+    },
+    settle(outcome: CampaignOutcome) {
+      if (outcome === 'complete') stamp = null
+    },
+    pending: () => stamp,
+  }
+}
 
 /** Hard stop so a misbehaving server can never spin the browser forever. */
 export const MAX_CAMPAIGN_BATCHES = 200

@@ -334,6 +334,20 @@ describe('POST /api/admin/send-stand-emails', () => {
     expect(state.queries.filter(q => !q.head).map(q => q.limit)).toEqual([25, 25, 50, 1])
   })
 
+  it('normalizes a parseable timestamp that contains a comma before filtering', async () => {
+    state.rows = [row({ id: 'a', email: 'a@x.com' })]
+    // RFC-2822 style: Date.parse accepts it, and its comma would otherwise split the
+    // or() clause into a bogus extra condition.
+    const res = await POST(req({ batchSize: 1, campaignStartedAt: 'Wed, 12 Aug 2026 00:00:00 GMT' }))
+    expect(res.status).toBe(200)
+    const clause = state.queries[0]!.or[0]!
+    expect(clause).toBe(
+      'stand_last_emailed_at.is.null,stand_last_emailed_at.lt.2026-08-12T00:00:00.000Z',
+    )
+    // Exactly one comma: the separator between the two intended conditions.
+    expect(clause.split(',')).toHaveLength(2)
+  })
+
   it('defaults a missing campaign timestamp to now rather than rejecting', async () => {
     state.rows = [row({ id: 'a', email: 'a@x.com' })]
     const res = await POST(req({ batchSize: 1 }))

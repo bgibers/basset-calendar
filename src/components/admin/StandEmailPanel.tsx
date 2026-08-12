@@ -1,9 +1,10 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { Order } from '@/lib/types'
 import {
   allEligibleAlreadyEmailed,
+  createCampaignTracker,
   isStandEmailEligible,
   runStandEmailCampaign,
   standEmailText,
@@ -59,6 +60,10 @@ export default function StandEmailPanel({
   const [status, setStatus] = useState('')
   const [showPreview, setShowPreview] = useState(false)
 
+  // Survives re-renders so a retry after a failure continues the same campaign instead of
+  // re-emailing everyone the failed run already reached.
+  const campaign = useRef(createCampaignTracker())
+
   const eligible = useMemo(() => orders.filter(isStandEmailEligible), [orders])
   const followUp = useMemo(() => allEligibleAlreadyEmailed(eligible), [eligible])
 
@@ -77,8 +82,10 @@ export default function StandEmailPanel({
 
     // One press of the button is one campaign: every batch below is scoped to "not yet
     // emailed since this instant", so nobody is emailed twice and the loop terminates.
-    // Pressing the button again later starts a new campaign — the follow-up.
-    const campaignStartedAt = new Date().toISOString()
+    // A press that follows an incomplete run *continues* that campaign (so a retry after
+    // fixing an address skips everyone already reached); only after a campaign completes
+    // does the next press start a new one — the follow-up.
+    const campaignStartedAt = campaign.current.current(new Date().toISOString())
 
     let lastSent = 0
     try {
@@ -104,6 +111,7 @@ export default function StandEmailPanel({
           },
         },
       )
+      campaign.current.settle(result.outcome)
       setFailures(result.failures)
       if (result.outcome === 'complete') {
         setStatus(`Done — sent ${plural(result.sent)}.`)

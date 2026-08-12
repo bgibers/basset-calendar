@@ -64,6 +64,10 @@ export async function POST(request: NextRequest) {
   if (!isValidCampaignStart(campaignStartedAt)) {
     return NextResponse.json({ error: 'invalid campaignStartedAt' }, { status: 400 })
   }
+  // Re-serialize before it reaches the `or()` filter: `Date.parse` accepts formats that
+  // contain a comma (`Wed, 12 Aug 2026 …`), and a comma inside the clause would split it
+  // into a bogus extra condition. Normalizing leaves exactly one safe shape.
+  const campaignCutoff = new Date(Date.parse(campaignStartedAt)).toISOString()
 
   // Every email carries a personal link built from APP_BASE_URL. Without it we would mass
   // send dead links, so fail before the loop rather than after the damage.
@@ -77,7 +81,7 @@ export async function POST(request: NextRequest) {
 
     // Oldest nudge first (never-emailed rows lead), then by calendar date so a partial
     // run walks the year in a predictable order.
-    const { data, error } = await eligible(supabase.from('orders').select('*'), campaignStartedAt)
+    const { data, error } = await eligible(supabase.from('orders').select('*'), campaignCutoff)
       .order('stand_last_emailed_at', { ascending: true, nullsFirst: true })
       .order('calendar_date', { ascending: true })
       .limit(batchSize)
@@ -109,7 +113,7 @@ export async function POST(request: NextRequest) {
     // Count what is left *after* the batch so the client knows whether to loop again.
     const { count, error: countError } = await eligible(
       supabase.from('orders').select('id', { count: 'exact', head: true }),
-      campaignStartedAt,
+      campaignCutoff,
     )
     if (countError) {
       console.error('[send stand emails] remaining count failed:', countError)

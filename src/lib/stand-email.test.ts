@@ -3,6 +3,7 @@ import {
   STAND_EMAIL_SUBJECT,
   standEmailText,
   clampBatchSize,
+  createCampaignTracker,
   isValidCampaignStart,
   runStandEmailCampaign,
   sendStandBatch,
@@ -250,6 +251,50 @@ describe('sendStandBatch', () => {
   })
 })
 
+describe('sendStandBatch delay bookkeeping', () => {
+  it('does not spend a pause on a row skipped for a blank address', async () => {
+    const mailer: StandMailer = { async sendMail() { return {} } }
+    const delay = vi.fn(async () => {})
+    // blank, real, blank, real -> exactly one pause, between the two real sends.
+    await sendStandBatch(
+      [
+        order({ id: 'a', email: '  ' }),
+        order({ id: 'b', email: 'b@x.com' }),
+        order({ id: 'c', email: '' }),
+        order({ id: 'd', email: 'd@x.com' }),
+      ],
+      { mailer, markSent: async () => {}, delay },
+    )
+    expect(delay).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not pause at all when every row is skipped', async () => {
+    const mailer: StandMailer = { async sendMail() { return {} } }
+    const delay = vi.fn(async () => {})
+    await sendStandBatch([order({ email: ' ' }), order({ email: '' })], {
+      mailer,
+      markSent: async () => {},
+      delay,
+    })
+    expect(delay).not.toHaveBeenCalled()
+  })
+
+  it('still pauses after a send that failed — the server was contacted', async () => {
+    const mailer: StandMailer = {
+      async sendMail() {
+        throw new Error('550 nope')
+      },
+    }
+    const delay = vi.fn(async () => {})
+    await sendStandBatch([order({ email: 'a@x.com' }), order({ email: 'b@x.com' })], {
+      mailer,
+      markSent: async () => {},
+      delay,
+    })
+    expect(delay).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('sendStandBatch blank addresses', () => {
   it('reports a whitespace-only address as a failure and never contacts SMTP for it', async () => {
     const sends: string[] = []
@@ -268,6 +313,51 @@ describe('sendStandBatch blank addresses', () => {
     expect(marked).toEqual(['b'])
     expect(result.sent).toBe(1)
     expect(result.failures).toEqual([{ email: '   ', error: 'blank email address' }])
+  })
+})
+
+describe('createCampaignTracker', () => {
+  const t1 = '2026-08-12T10:00:00.000Z'
+  const t2 = '2026-08-12T10:05:00.000Z'
+  const t3 = '2026-08-12T10:09:00.000Z'
+
+  it('reuses the stamp on a retry after a failed run, so nobody is emailed twice', () => {
+    const tracker = createCampaignTracker()
+    // First press: fresh campaign, run ends with failures.
+    expect(tracker.current(t1)).toBe(t1)
+    tracker.settle('failures')
+    // Second press (the retry after fixing an address): same campaign continues.
+    expect(tracker.current(t2)).toBe(t1)
+    tracker.settle('failures')
+    // A third press keeps continuing it — the stamp never drifts while work is unfinished.
+    expect(tracker.current(t3)).toBe(t1)
+    expect(tracker.pending()).toBe(t1)
+  })
+
+  it('keeps the stamp when a run stalls', () => {
+    const tracker = createCampaignTracker()
+    tracker.current(t1)
+    tracker.settle('stalled')
+    expect(tracker.current(t2)).toBe(t1)
+  })
+
+  it('starts a fresh campaign on the next press after a completed run', () => {
+    const tracker = createCampaignTracker()
+    expect(tracker.current(t1)).toBe(t1)
+    tracker.settle('complete')
+    expect(tracker.pending()).toBeNull()
+    // The follow-up is a genuinely new campaign, so previously emailed rows are included.
+    expect(tracker.current(t2)).toBe(t2)
+    expect(tracker.pending()).toBe(t2)
+  })
+
+  it('recovers to a fresh campaign after a failed run is eventually completed', () => {
+    const tracker = createCampaignTracker()
+    tracker.current(t1)
+    tracker.settle('failures')
+    expect(tracker.current(t2)).toBe(t1)
+    tracker.settle('complete')
+    expect(tracker.current(t3)).toBe(t3)
   })
 })
 
