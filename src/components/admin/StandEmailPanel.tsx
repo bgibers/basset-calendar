@@ -5,20 +5,20 @@ import type { Order } from '@/lib/types'
 import {
   allEligibleAlreadyEmailed,
   isStandEmailEligible,
+  runStandEmailCampaign,
   standEmailText,
   STAND_EMAIL_SUBJECT,
   DEFAULT_BATCH_SIZE,
+  type CampaignBatchResult,
 } from '@/lib/stand-email'
+
+function plural(n: number): string {
+  return `${n} email${n === 1 ? '' : 's'}`
+}
 
 interface Failure {
   email: string
   error: string
-}
-
-interface SendResponse {
-  sent: number
-  remaining: number
-  failures: Failure[]
 }
 
 /** A stand-in order so the preview shows the real template, never a hand-copied version. */
@@ -75,44 +75,50 @@ export default function StandEmailPanel({
     setTotal(target)
     setSentCount(0)
 
-    let running = 0
+    // One press of the button is one campaign: every batch below is scoped to "not yet
+    // emailed since this instant", so nobody is emailed twice and the loop terminates.
+    // Pressing the button again later starts a new campaign — the follow-up.
+    const campaignStartedAt = new Date().toISOString()
+
+    let lastSent = 0
     try {
-      // Loop batch by batch so a long list never depends on one 60 s request.
-      for (;;) {
-        const res = await fetch('/api/admin/send-stand-emails', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ batchSize: DEFAULT_BATCH_SIZE }),
-        })
-        if (!res.ok) {
-          const body = await res.json().catch(() => null)
-          throw new Error(body?.error ?? `Request failed (${res.status})`)
-        }
-        const body = (await res.json()) as SendResponse
-        running += body.sent
-        setSentCount(running)
-        if (body.failures.length > 0) {
-          setFailures(body.failures)
-          setStatus(
-            `Stopped after ${running} email${running === 1 ? '' : 's'} because some sends failed. Fix the addresses below, then run it again — everyone already emailed is skipped on the next run.`,
-          )
-          break
-        }
-        if (body.remaining === 0) {
-          setStatus(`Done — sent ${running} email${running === 1 ? '' : 's'}.`)
-          break
-        }
-        if (body.sent === 0) {
-          // Nothing sent and work still remaining: stop rather than spin forever.
-          setStatus(
-            `Stopped: ${body.remaining} recipient${body.remaining === 1 ? '' : 's'} remain but the last batch sent nothing.`,
-          )
-          break
-        }
+      const result = await runStandEmailCampaign(
+        async body => {
+          const res = await fetch('/api/admin/send-stand-emails', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          })
+          if (!res.ok) {
+            const errorBody = await res.json().catch(() => null)
+            throw new Error(errorBody?.error ?? `Request failed (${res.status})`)
+          }
+          return (await res.json()) as CampaignBatchResult
+        },
+        {
+          campaignStartedAt,
+          batchSize: DEFAULT_BATCH_SIZE,
+          onProgress: sent => {
+            lastSent = sent
+            setSentCount(sent)
+          },
+        },
+      )
+      setFailures(result.failures)
+      if (result.outcome === 'complete') {
+        setStatus(`Done — sent ${plural(result.sent)}.`)
+      } else if (result.outcome === 'failures') {
+        setStatus(
+          `Stopped after ${plural(result.sent)} because some sends failed. Fix the addresses below, then run it again — everyone already emailed is skipped.`,
+        )
+      } else {
+        setStatus(
+          `Stopped: ${result.remaining} recipient${result.remaining === 1 ? '' : 's'} remain but the last batch sent nothing.`,
+        )
       }
     } catch (err) {
       setStatus(
-        `Sending stopped: ${err instanceof Error ? err.message : 'unknown error'}. ${running} email${running === 1 ? '' : 's'} went out before the error.`,
+        `Sending stopped: ${err instanceof Error ? err.message : 'unknown error'}. ${plural(lastSent)} went out before the error.`,
       )
     } finally {
       setSending(false)

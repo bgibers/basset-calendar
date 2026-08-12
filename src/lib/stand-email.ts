@@ -115,6 +115,12 @@ export async function sendStandBatch(
 
   for (let i = 0; i < orders.length; i++) {
     const order = orders[i]
+    // `email <> ''` in SQL still lets `'   '` through. Report those instead of handing
+    // whitespace to the SMTP server, so the admin sees the row and the counts line up.
+    if ((order.email ?? '').trim() === '') {
+      failures.push({ email: order.email ?? '', error: 'blank email address' })
+      continue
+    }
     if (i > 0) await delay(SEND_DELAY_MS)
     try {
       await mailer.sendMail({
@@ -140,4 +146,70 @@ export async function sendStandBatch(
   }
 
   return { sent, failures }
+}
+
+/**
+ * How far in the future a client-supplied campaign timestamp may sit before we reject it.
+ * Clock skew between the admin's browser and the server is normal; a timestamp minutes
+ * ahead is not, and would silently exclude rows from the campaign.
+ */
+export const CAMPAIGN_SKEW_MS = 60_000
+
+/**
+ * A campaign is one press of the send button, identified by the moment it started.
+ * Scoping every batch to "not yet emailed since this instant" is what makes the batch
+ * loop terminate and guarantees nobody is emailed twice in one campaign.
+ */
+export function isValidCampaignStart(value: unknown, now: number = Date.now()): value is string {
+  if (typeof value !== 'string' || value.trim() === '') return false
+  const parsed = Date.parse(value)
+  if (Number.isNaN(parsed)) return false
+  return parsed <= now + CAMPAIGN_SKEW_MS
+}
+
+export interface CampaignBatchResult {
+  sent: number
+  remaining: number
+  failures: { email: string; error: string }[]
+}
+
+export type CampaignOutcome =
+  /** Nothing left to send. */
+  | 'complete'
+  /** Stopped early because a batch reported failures. */
+  | 'failures'
+  /** Work remains but a batch sent nothing — stop rather than spin. */
+  | 'stalled'
+
+/** Hard stop so a misbehaving server can never spin the browser forever. */
+export const MAX_CAMPAIGN_BATCHES = 200
+
+/**
+ * Drive one campaign to completion, batch by batch. `postBatch` is injected so this loop
+ * is testable without a network, and so the component stays presentational.
+ */
+export async function runStandEmailCampaign(
+  postBatch: (body: { batchSize: number; campaignStartedAt: string }) => Promise<CampaignBatchResult>,
+  options: {
+    campaignStartedAt: string
+    batchSize?: number
+    onProgress?: (sentSoFar: number) => void
+    maxBatches?: number
+  },
+): Promise<{ sent: number; remaining: number; failures: { email: string; error: string }[]; outcome: CampaignOutcome }> {
+  const batchSize = options.batchSize ?? DEFAULT_BATCH_SIZE
+  const maxBatches = options.maxBatches ?? MAX_CAMPAIGN_BATCHES
+  let sent = 0
+  let remaining = 0
+
+  for (let batch = 0; batch < maxBatches; batch++) {
+    const result = await postBatch({ batchSize, campaignStartedAt: options.campaignStartedAt })
+    sent += result.sent
+    remaining = result.remaining
+    options.onProgress?.(sent)
+    if (result.failures.length > 0) return { sent, remaining, failures: result.failures, outcome: 'failures' }
+    if (result.remaining === 0) return { sent, remaining: 0, failures: [], outcome: 'complete' }
+    if (result.sent === 0) return { sent, remaining, failures: [], outcome: 'stalled' }
+  }
+  return { sent, remaining, failures: [], outcome: 'stalled' }
 }

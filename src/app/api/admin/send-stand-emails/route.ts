@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/db'
 import { isAdminRequest } from '@/lib/admin-auth'
 import { getTransporter } from '@/lib/mailer'
-import { clampBatchSize, sendStandBatch } from '@/lib/stand-email'
+import { clampBatchSize, isValidCampaignStart, sendStandBatch } from '@/lib/stand-email'
 import type { Order } from '@/lib/types'
 
 export const runtime = 'nodejs'
@@ -11,11 +11,26 @@ export const dynamic = 'force-dynamic'
 // clock plus SMTP round trips. 60 s leaves headroom without risking a hung request.
 export const maxDuration = 60
 
-/** Rows still worth emailing: no stand option recorded and a non-blank email address. */
+/**
+ * Rows still worth emailing *in this campaign*: no stand option recorded, an email address,
+ * and not already emailed since the campaign started.
+ *
+ * The campaign scope is what makes the client's batch loop terminate — without it, every
+ * batch would re-fetch the rows the previous batch just emailed and `remaining` would
+ * never reach zero. A later press of the button uses a newer timestamp and therefore
+ * becomes a follow-up to whoever still has not answered.
+ */
 function eligible<
-  T extends { is(column: string, value: null): T; neq(column: string, value: string): T },
->(query: T): T {
-  return query.is('stand_option', null).neq('email', '')
+  T extends {
+    is(column: string, value: null): T
+    neq(column: string, value: string): T
+    or(filter: string): T
+  },
+>(query: T, campaignStartedAt: string): T {
+  return query
+    .is('stand_option', null)
+    .neq('email', '')
+    .or(`stand_last_emailed_at.is.null,stand_last_emailed_at.lt.${campaignStartedAt}`)
 }
 
 export async function POST(request: NextRequest) {
@@ -38,18 +53,31 @@ export async function POST(request: NextRequest) {
   } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }
-  const batchSize = clampBatchSize(
-    typeof body === 'object' && body !== null && 'batchSize' in body
-      ? (body as { batchSize: unknown }).batchSize
-      : undefined,
-  )
+  const fields = (typeof body === 'object' && body !== null ? body : {}) as Record<string, unknown>
+  const batchSize = clampBatchSize(fields.batchSize)
+
+  // One press of the send button = one campaign. The client stamps it so every batch in
+  // that press shares a scope; a caller that omits it gets a single-batch campaign
+  // starting now, which is still correct (just not resumable).
+  const campaignStartedAt =
+    fields.campaignStartedAt === undefined ? new Date().toISOString() : fields.campaignStartedAt
+  if (!isValidCampaignStart(campaignStartedAt)) {
+    return NextResponse.json({ error: 'invalid campaignStartedAt' }, { status: 400 })
+  }
+
+  // Every email carries a personal link built from APP_BASE_URL. Without it we would mass
+  // send dead links, so fail before the loop rather than after the damage.
+  if (!(process.env.APP_BASE_URL ?? '').trim()) {
+    console.error('[send stand emails] APP_BASE_URL is unset; refusing to send dead links')
+    return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 })
+  }
 
   try {
     const supabase = getSupabaseAdmin()
 
     // Oldest nudge first (never-emailed rows lead), then by calendar date so a partial
     // run walks the year in a predictable order.
-    const { data, error } = await eligible(supabase.from('orders').select('*'))
+    const { data, error } = await eligible(supabase.from('orders').select('*'), campaignStartedAt)
       .order('stand_last_emailed_at', { ascending: true, nullsFirst: true })
       .order('calendar_date', { ascending: true })
       .limit(batchSize)
@@ -65,6 +93,7 @@ export async function POST(request: NextRequest) {
     const { sent, failures } = await sendStandBatch(orders, {
       mailer: transporter,
       from: process.env.EMAIL_USER,
+      baseUrl: process.env.APP_BASE_URL,
       markSent: async order => {
         const { error: updateError } = await supabase
           .from('orders')
@@ -80,6 +109,7 @@ export async function POST(request: NextRequest) {
     // Count what is left *after* the batch so the client knows whether to loop again.
     const { count, error: countError } = await eligible(
       supabase.from('orders').select('id', { count: 'exact', head: true }),
+      campaignStartedAt,
     )
     if (countError) {
       console.error('[send stand emails] remaining count failed:', countError)

@@ -3,6 +3,8 @@ import {
   STAND_EMAIL_SUBJECT,
   standEmailText,
   clampBatchSize,
+  isValidCampaignStart,
+  runStandEmailCampaign,
   sendStandBatch,
   type StandMailer,
 } from './stand-email'
@@ -245,6 +247,130 @@ describe('sendStandBatch', () => {
       failures: [],
     })
     expect(delay).not.toHaveBeenCalled()
+  })
+})
+
+describe('sendStandBatch blank addresses', () => {
+  it('reports a whitespace-only address as a failure and never contacts SMTP for it', async () => {
+    const sends: string[] = []
+    const mailer: StandMailer = {
+      async sendMail(options) {
+        sends.push(options.to)
+        return {}
+      },
+    }
+    const marked: string[] = []
+    const result = await sendStandBatch(
+      [order({ id: 'a', email: '   ' }), order({ id: 'b', email: 'b@x.com' })],
+      { mailer, markSent: async o => void marked.push(o.id), delay: async () => {} },
+    )
+    expect(sends).toEqual(['b@x.com'])
+    expect(marked).toEqual(['b'])
+    expect(result.sent).toBe(1)
+    expect(result.failures).toEqual([{ email: '   ', error: 'blank email address' }])
+  })
+})
+
+describe('isValidCampaignStart', () => {
+  const now = Date.parse('2026-08-12T10:00:00.000Z')
+
+  it('accepts an ISO timestamp at or before now', () => {
+    expect(isValidCampaignStart('2026-08-12T10:00:00.000Z', now)).toBe(true)
+    expect(isValidCampaignStart('2026-08-12T09:00:00.000Z', now)).toBe(true)
+  })
+
+  it('tolerates small clock skew but rejects a clearly future stamp', () => {
+    expect(isValidCampaignStart(new Date(now + 30_000).toISOString(), now)).toBe(true)
+    expect(isValidCampaignStart(new Date(now + 10 * 60_000).toISOString(), now)).toBe(false)
+  })
+
+  it('rejects blanks, non-strings and unparseable values', () => {
+    expect(isValidCampaignStart('', now)).toBe(false)
+    expect(isValidCampaignStart('   ', now)).toBe(false)
+    expect(isValidCampaignStart('not-a-date', now)).toBe(false)
+    expect(isValidCampaignStart(123, now)).toBe(false)
+    expect(isValidCampaignStart(null, now)).toBe(false)
+    expect(isValidCampaignStart(undefined, now)).toBe(false)
+  })
+})
+
+describe('runStandEmailCampaign', () => {
+  const campaignStartedAt = '2026-08-12T10:00:00.000Z'
+
+  it('loops until remaining reaches 0 and reports progress as it goes', async () => {
+    const batches = [
+      { sent: 25, remaining: 30, failures: [] },
+      { sent: 25, remaining: 5, failures: [] },
+      { sent: 5, remaining: 0, failures: [] },
+    ]
+    const seen: { batchSize: number; campaignStartedAt: string }[] = []
+    const progress: number[] = []
+    const result = await runStandEmailCampaign(
+      async body => {
+        seen.push(body)
+        return batches.shift()!
+      },
+      { campaignStartedAt, onProgress: n => void progress.push(n) },
+    )
+    expect(result).toEqual({ sent: 55, remaining: 0, failures: [], outcome: 'complete' })
+    expect(seen).toHaveLength(3)
+    // Every batch carries the same campaign stamp — that is what makes it terminate.
+    expect(seen.every(b => b.campaignStartedAt === campaignStartedAt)).toBe(true)
+    expect(seen.every(b => b.batchSize === 25)).toBe(true)
+    expect(progress).toEqual([25, 50, 55])
+  })
+
+  it('stops on the first batch that reports failures', async () => {
+    const batches = [
+      { sent: 2, remaining: 9, failures: [] },
+      { sent: 1, remaining: 8, failures: [{ email: 'b@x.com', error: 'nope' }] },
+      { sent: 5, remaining: 0, failures: [] },
+    ]
+    const result = await runStandEmailCampaign(async () => batches.shift()!, {
+      campaignStartedAt,
+    })
+    expect(result.outcome).toBe('failures')
+    expect(result.sent).toBe(3)
+    expect(result.failures).toEqual([{ email: 'b@x.com', error: 'nope' }])
+    expect(batches).toHaveLength(1) // the third batch was never requested
+  })
+
+  it('stops instead of spinning when a batch sends nothing but work remains', async () => {
+    let calls = 0
+    const result = await runStandEmailCampaign(
+      async () => {
+        calls++
+        return { sent: 0, remaining: 4, failures: [] }
+      },
+      { campaignStartedAt },
+    )
+    expect(result.outcome).toBe('stalled')
+    expect(result.remaining).toBe(4)
+    expect(calls).toBe(1)
+  })
+
+  it('gives up after maxBatches rather than looping forever', async () => {
+    let calls = 0
+    const result = await runStandEmailCampaign(
+      async () => {
+        calls++
+        return { sent: 1, remaining: 99, failures: [] }
+      },
+      { campaignStartedAt, batchSize: 1, maxBatches: 4 },
+    )
+    expect(calls).toBe(4)
+    expect(result.outcome).toBe('stalled')
+  })
+
+  it('lets a transport error out of the loop for the caller to report', async () => {
+    await expect(
+      runStandEmailCampaign(
+        async () => {
+          throw new Error('Request failed (500)')
+        },
+        { campaignStartedAt },
+      ),
+    ).rejects.toThrow('Request failed (500)')
   })
 })
 
