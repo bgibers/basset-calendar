@@ -15,6 +15,7 @@ import {
 } from '@/lib/order-flags'
 import { createLatestOnly } from '@/lib/latest-request'
 import { MONTHS } from '@/lib/months'
+import StandEmailPanel from '@/components/admin/StandEmailPanel'
 
 const FILTERS: OrderFilter[] = ['all', 'missing-stand', 'no-email', 'flagged']
 const YEARS = [2026, 2027, 2028]
@@ -185,6 +186,9 @@ export default function OrdersTable() {
           inside, orders with no photo, and any photo that failed to download.
         </p>
       </div>
+
+      {/* Lives here so the eligible count follows the year loaded in the table. */}
+      <StandEmailPanel orders={orders} onSent={() => void load(year)} />
 
       <div className="flex flex-wrap gap-2">
         {FILTERS.map(f => (
