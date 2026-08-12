@@ -94,10 +94,12 @@ server routes using the service-role key. The anon key is not shipped to the bro
 
 ### Email (cPanel SMTP)
 
-- nodemailer against the cPanel mail account (existing `EMAIL_USER`/`EMAIL_PASSWORD`).
-  Correct host/port to be confirmed by a live SMTP test (`mail.<domain>` on 587/465
-  are the usual cPanel endpoints; the current code's `<domain>:587` may be why nothing
-  ever sent). Verify SPF/DKIM records exist in cPanel before the mass send.
+- nodemailer against the cPanel mail account. **Confirmed working 2026-08-12 by live
+  test**: host `barcsebasset-a-daycalendar.org`, port `465`, SSL (`secure: true`),
+  auth `order@barcsebasset-a-daycalendar.org` + regenerated password. Test message
+  landed in a Gmail inbox (not spam). The historical failure was a rejected password
+  plus port 587/STARTTLS; the send-email route gets updated to these settings via
+  `EMAIL_HOST`/`EMAIL_PORT` env vars.
 - Mass sends are **throttled batches** (size configurable, default ~25 per request)
   driven from the dashboard with a progress indicator, to stay under shared-host
   hourly caps. Each send updates `stand_emails_sent`/`stand_last_emailed_at`.
