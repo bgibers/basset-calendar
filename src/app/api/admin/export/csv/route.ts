@@ -36,7 +36,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Could not load orders' }, { status: 500 })
     }
 
-    const csv = toCsv((data ?? []) as Record<string, unknown>[])
+    // stand_token is the secret in the public /stand/{token} URL — a spreadsheet
+    // that gets forwarded would be a list of live magic links. Every other column
+    // is exported.
+    const rows = ((data ?? []) as Record<string, unknown>[]).map(
+      ({ stand_token: _standToken, ...rest }) => rest,
+    )
+    const csv = toCsv(rows)
     return new NextResponse(csv, {
       status: 200,
       headers: {

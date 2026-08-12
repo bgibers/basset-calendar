@@ -7,7 +7,16 @@
  */
 function escapeField(value: unknown): string {
   if (value === null || value === undefined) return ''
-  const s = typeof value === 'string' ? value : String(value)
+  let s: string
+  if (typeof value === 'string') {
+    // Formula injection: Excel/Sheets execute a cell that opens with = + - or @.
+    // Prefix an apostrophe so the spreadsheet treats it as literal text. Only
+    // strings are neutralized — a real number like -5 cannot be a formula, and
+    // prefixing it would corrupt the numeric column.
+    s = /^[=+\-@]/.test(value) ? `'${value}` : value
+  } else {
+    s = String(value)
+  }
   // A field must be quoted if it contains the delimiter, a quote, or a line break.
   if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`
   return s

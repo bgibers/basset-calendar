@@ -46,6 +46,29 @@ describe('toCsv', () => {
     expect(csv).toBe('a,b\r\n1,2\r\n,4')
   })
 
+  it("prefixes a ' to string fields starting with =, +, - or @ (formula injection)", () => {
+    expect(toCsv([{ a: '=1+1' }])).toBe("a\r\n'=1+1")
+    expect(toCsv([{ a: '+1' }])).toBe("a\r\n'+1")
+    expect(toCsv([{ a: '-1' }])).toBe("a\r\n'-1")
+    expect(toCsv([{ a: '@SUM(A1)' }])).toBe("a\r\n'@SUM(A1)")
+  })
+
+  it('still quotes a neutralized field that also needs quoting', () => {
+    expect(toCsv([{ a: '=HYPERLINK("x","y")' }])).toBe('a\r\n"\'=HYPERLINK(""x"",""y"")"')
+  })
+
+  it('neutralizes a header cell that looks like a formula', () => {
+    expect(toCsv([{ '=cmd': 1 }])).toBe("'=cmd\r\n1")
+  })
+
+  it('leaves numbers alone even when negative', () => {
+    expect(toCsv([{ a: -5 }])).toBe('a\r\n-5')
+  })
+
+  it('leaves strings that merely contain those characters alone', () => {
+    expect(toCsv([{ a: 'a=b' }])).toBe('a\r\na=b')
+  })
+
   it('ignores keys that are absent from the first row', () => {
     const csv = toCsv([{ a: 1 }, { a: 2, extra: 'nope' }])
     expect(csv).toBe('a\r\n1\r\n2')
