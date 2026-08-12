@@ -10,11 +10,8 @@ export default function AdminDashboard() {
         </p>
       </header>
 
+      {/* Export controls live inside OrdersTable so they follow the selected year. */}
       <div className="grid gap-4 sm:grid-cols-2">
-        <section className="rounded border p-3">
-          <h2 className="font-semibold">Export</h2>
-          <p className="text-sm text-gray-600">CSV and monthly photo ZIP downloads (coming soon).</p>
-        </section>
         <section className="rounded border p-3">
           <h2 className="font-semibold">Email</h2>
           <p className="text-sm text-gray-600">Stand-request emails to owners (coming soon).</p>

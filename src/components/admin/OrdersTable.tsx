@@ -14,6 +14,7 @@ import {
   type OrderFilter,
 } from '@/lib/order-flags'
 import { createLatestOnly } from '@/lib/latest-request'
+import { MONTHS } from '@/lib/months'
 
 const FILTERS: OrderFilter[] = ['all', 'missing-stand', 'no-email', 'flagged']
 const YEARS = [2026, 2027, 2028]
@@ -26,6 +27,8 @@ export default function OrdersTable() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [savingIds, setSavingIds] = useState<Set<string>>(() => new Set())
+  // Export lives here so the download links always use the year shown in the table.
+  const [exportMonth, setExportMonth] = useState<string>(MONTHS[0])
 
   // Guards against a slow response for an earlier year resolving after a newer one and
   // rendering the wrong year's rows: superseded loads are aborted and their results
@@ -144,6 +147,43 @@ export default function OrdersTable() {
         <span className="text-sm text-gray-600">
           {loading ? 'Loading…' : `${visible.length} of ${orders.length} orders`}
         </span>
+      </div>
+
+      <div className="rounded border p-3 space-y-2">
+        <h2 className="font-semibold">Export</h2>
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          {/* Plain links: the admin session cookie rides along with the download. */}
+          <a
+            href={`/api/admin/export/csv?year=${year}`}
+            className="rounded border px-3 py-1 hover:bg-gray-50"
+          >
+            Download CSV ({year})
+          </a>
+          <label className="font-medium">
+            Photos for{' '}
+            <select
+              value={exportMonth}
+              onChange={e => setExportMonth(e.target.value)}
+              className="border rounded p-1"
+            >
+              {MONTHS.map(m => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </select>
+          </label>
+          <a
+            href={`/api/admin/export/zip?year=${year}&month=${exportMonth}`}
+            className="rounded border px-3 py-1 hover:bg-gray-50"
+          >
+            Download photos ZIP
+          </a>
+        </div>
+        <p className="text-xs text-gray-600">
+          The ZIP can take a minute to build. It always includes a manifest.txt listing the photos
+          inside, orders with no photo, and any photo that failed to download.
+        </p>
       </div>
 
       <div className="flex flex-wrap gap-2">
