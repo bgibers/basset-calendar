@@ -159,9 +159,9 @@ export default function StandEmailPanel({
   const progress = total > 0 ? Math.min(100, Math.round((sentCount / total) * 100)) : 0
 
   return (
-    <div className="rounded border p-3 space-y-3">
-      <h2 className="font-semibold">Stand-request emails</h2>
-      <p className="text-sm text-gray-600">
+    <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+      <h2 className="text-sm font-semibold text-gray-900">Stand-option emails</h2>
+      <p className="text-sm text-gray-500">
         {eligible.length === 0
           ? 'No one to email for this year — every order with an email address already has a stand option recorded.'
           : `${eligible.length} order${eligible.length === 1 ? '' : 's'} in this year have no stand option and a working email address.`}
@@ -173,36 +173,36 @@ export default function StandEmailPanel({
           type="button"
           onClick={() => setConfirming(true)}
           disabled={sending || eligible.length === 0 || confirming}
-          className="rounded bg-blue-600 px-3 py-1 text-white disabled:opacity-50"
+          className="rounded-md bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700 disabled:opacity-50"
         >
           {sending ? 'Sending…' : label}
         </button>
         <button
           type="button"
           onClick={() => setShowPreview(v => !v)}
-          className="rounded border px-3 py-1 hover:bg-gray-50"
+          className="rounded-md border border-gray-300 bg-white px-3 py-1.5 font-medium text-gray-700 shadow-sm hover:bg-gray-50"
         >
           {showPreview ? 'Hide preview' : 'Preview email'}
         </button>
       </div>
 
       {showPreview && (
-        <div className="rounded border bg-gray-50 p-3 text-xs">
-          <p className="font-medium">Subject: {STAND_EMAIL_SUBJECT}</p>
-          <p className="text-gray-600">
+        <div className="rounded-md border border-gray-200 bg-gray-50 p-3 text-xs text-gray-700">
+          <p className="font-medium text-gray-900">Subject: {STAND_EMAIL_SUBJECT}</p>
+          <p className="text-gray-500">
             Sample values shown; each real email uses that owner&apos;s own name, dog, date and
             personal link.
           </p>
-          <pre className="mt-2 whitespace-pre-wrap font-mono">{preview}</pre>
+          <pre className="mt-2 whitespace-pre-wrap font-mono text-gray-700">{preview}</pre>
         </div>
       )}
 
       {confirming && (
-        <div className="rounded border border-blue-300 bg-blue-50 p-3 text-sm space-y-2">
-          <p className="font-medium">
+        <div className="space-y-2 rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          <p className="font-medium text-amber-900">
             Send this email to {eligible.length} {eligible.length === 1 ? 'person' : 'people'}?
           </p>
-          <p className="text-gray-700">
+          <p className="text-amber-800">
             Emails go out in batches of {DEFAULT_BATCH_SIZE}, about two per second, and cover every
             order in the database that is still missing a stand option — not only the year shown
             above. This cannot be undone.
@@ -212,14 +212,14 @@ export default function StandEmailPanel({
               type="button"
               onClick={() => void sendAll()}
               disabled={sending}
-              className="rounded bg-blue-600 px-3 py-1 text-white disabled:opacity-50"
+              className="rounded-md bg-red-600 px-4 py-2 font-medium text-white hover:bg-red-700 disabled:opacity-50"
             >
               {sending ? 'Sending…' : 'Yes, send now'}
             </button>
             <button
               type="button"
               onClick={() => setConfirming(false)}
-              className="rounded border px-3 py-1 bg-white"
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 font-medium text-gray-700 shadow-sm hover:bg-gray-50"
             >
               Cancel
             </button>
@@ -229,20 +229,30 @@ export default function StandEmailPanel({
 
       {(sending || sentCount > 0) && total > 0 && (
         <div className="space-y-1">
-          <div className="h-2 w-full overflow-hidden rounded bg-gray-200">
-            <div className="h-2 bg-blue-600 transition-all" style={{ width: `${progress}%` }} />
+          <div className="h-2 w-full overflow-hidden rounded-full bg-gray-200">
+            <div className="h-2 bg-red-600 transition-all" style={{ width: `${progress}%` }} />
           </div>
-          <p className="text-xs text-gray-600">
+          <p className="text-xs text-gray-500">
             {sentCount} of {total} sent
           </p>
         </div>
       )}
 
-      {status && <p className="text-sm text-gray-800">{status}</p>}
+      {status && (
+        <p
+          className={`rounded-md border p-3 text-sm ${
+            !sending && failures.length === 0 && total > 0 && sentCount >= total
+              ? 'border-green-200 bg-green-50 text-green-800'
+              : 'border-gray-200 bg-gray-50 text-gray-700'
+          }`}
+        >
+          {status}
+        </p>
+      )}
 
       {skipped.length > 0 && (
-        <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
-          <p className="font-medium">
+        <div className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+          <p className="font-medium text-amber-900">
             {skipped.length} order{skipped.length === 1 ? '' : 's'} skipped — the email address is
             unusable, so nothing was sent:
           </p>
@@ -260,8 +270,8 @@ export default function StandEmailPanel({
       )}
 
       {failures.length > 0 && (
-        <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">
-          <p className="font-medium">
+        <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+          <p className="font-medium text-red-900">
             {failures.length} email{failures.length === 1 ? '' : 's'} could not be sent:
           </p>
           <ul className="mt-1 list-disc pl-5">

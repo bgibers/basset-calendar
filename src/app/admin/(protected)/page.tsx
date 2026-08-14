@@ -2,17 +2,21 @@ import OrdersTable from '@/components/admin/OrdersTable'
 
 export default function AdminDashboard() {
   return (
-    <main className="min-h-screen p-4 space-y-6">
-      <header className="space-y-1">
-        <h1 className="text-xl font-bold">Calendar orders dashboard</h1>
-        <p className="text-sm text-gray-600">
-          Review orders, spot data problems, and record each dog&apos;s stand option.
-        </p>
-      </header>
+    <main className="min-h-screen bg-gray-100 p-4 text-gray-900">
+      <div className="mx-auto max-w-6xl space-y-4">
+        <header className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+          <h1 className="text-xl font-bold text-gray-900">
+            BaRCSE Basset-a-Day Calendar — Admin
+          </h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Review orders, spot data problems, and record each dog&apos;s stand option.
+          </p>
+        </header>
 
-      {/* Export and stand-request email controls live inside OrdersTable so they follow
-          the selected year. */}
-      <OrdersTable />
+        {/* Export and stand-request email controls live inside OrdersTable so they follow
+            the selected year. */}
+        <OrdersTable />
+      </div>
     </main>
   )
 }

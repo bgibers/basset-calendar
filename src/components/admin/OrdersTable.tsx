@@ -130,13 +130,13 @@ export default function OrdersTable() {
 
   return (
     <section className="space-y-4">
-      <div className="flex flex-wrap items-center gap-3">
-        <label className="text-sm font-medium">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-5 py-4 shadow-sm">
+        <label className="text-sm font-medium text-gray-700">
           Year{' '}
           <select
             value={year}
             onChange={e => setYear(Number(e.target.value))}
-            className="border rounded p-1"
+            className="ml-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
           >
             {YEARS.map(y => (
               <option key={y} value={y}>
@@ -145,27 +145,27 @@ export default function OrdersTable() {
             ))}
           </select>
         </label>
-        <span className="text-sm text-gray-600">
+        <span className="text-sm text-gray-500">
           {loading ? 'Loading…' : `${visible.length} of ${orders.length} orders`}
         </span>
       </div>
 
-      <div className="rounded border p-3 space-y-2">
-        <h2 className="font-semibold">Export</h2>
+      <div className="space-y-3 rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+        <h2 className="text-sm font-semibold text-gray-900">Exports</h2>
         <div className="flex flex-wrap items-center gap-3 text-sm">
           {/* Plain links: the admin session cookie rides along with the download. */}
           <a
             href={`/api/admin/export/csv?year=${year}`}
-            className="rounded border px-3 py-1 hover:bg-gray-50"
+            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 font-medium text-gray-700 shadow-sm hover:bg-gray-50"
           >
             Download CSV ({year})
           </a>
-          <label className="font-medium">
+          <label className="font-medium text-gray-700">
             Photos for{' '}
             <select
               value={exportMonth}
               onChange={e => setExportMonth(e.target.value)}
-              className="border rounded p-1"
+              className="ml-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
             >
               {MONTHS.map(m => (
                 <option key={m} value={m}>
@@ -176,12 +176,12 @@ export default function OrdersTable() {
           </label>
           <a
             href={`/api/admin/export/zip?year=${year}&month=${exportMonth}`}
-            className="rounded border px-3 py-1 hover:bg-gray-50"
+            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 font-medium text-gray-700 shadow-sm hover:bg-gray-50"
           >
             Download photos ZIP
           </a>
         </div>
-        <p className="text-xs text-gray-600">
+        <p className="text-xs text-gray-500">
           The ZIP can take a minute to build. It always includes a manifest.txt listing the photos
           inside, orders with no photo, and any photo that failed to download.
         </p>
@@ -190,103 +190,133 @@ export default function OrdersTable() {
       {/* Lives here so the eligible count follows the year loaded in the table. */}
       <StandEmailPanel orders={orders} onSent={() => void load(year)} />
 
-      <div className="flex flex-wrap gap-2">
-        {FILTERS.map(f => (
-          <button
-            key={f}
-            type="button"
-            onClick={() => setFilter(f)}
-            className={`rounded-full border px-3 py-1 text-sm ${
-              filter === f ? 'bg-blue-600 text-white border-blue-600' : 'bg-white text-gray-700'
-            }`}
-          >
-            {FILTER_LABELS[f]} ({counts[f] ?? 0})
-          </button>
-        ))}
-      </div>
-
-      {error && (
-        <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-700">
-          <p className="font-medium">Could not load orders.</p>
-          <p>{error}</p>
-          <button
-            type="button"
-            onClick={() => void load(year)}
-            className="mt-2 rounded border border-red-400 px-2 py-1"
-          >
-            Retry
-          </button>
+      <div className="space-y-4 rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold text-gray-900">Orders</h2>
+          <div className="flex flex-wrap gap-2">
+            {FILTERS.map(f => (
+              <button
+                key={f}
+                type="button"
+                onClick={() => setFilter(f)}
+                className={`rounded-full border px-3 py-1 text-sm font-medium ${
+                  filter === f
+                    ? 'border-red-600 bg-red-600 text-white'
+                    : 'border-gray-300 bg-white text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                {FILTER_LABELS[f]} ({counts[f] ?? 0})
+              </button>
+            ))}
+          </div>
         </div>
-      )}
 
-      {!loading && !error && visible.length === 0 && (
-        <p className="text-sm text-gray-600">No orders match this filter.</p>
-      )}
+        {error && (
+          <div className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+            <p className="font-medium">Could not load orders.</p>
+            <p>{error}</p>
+            <button
+              type="button"
+              onClick={() => void load(year)}
+              className="mt-2 rounded-md border border-red-300 bg-white px-3 py-1 font-medium text-red-700 hover:bg-red-100"
+            >
+              Retry
+            </button>
+          </div>
+        )}
 
-      {visible.length > 0 && (
-        <div className="overflow-x-auto">
-          <table className="min-w-full text-sm border-collapse">
+        {loading && !error && <p className="py-12 text-center text-gray-500">Loading orders…</p>}
+
+        {!loading && !error && visible.length === 0 && (
+          <p className="py-12 text-center text-gray-500">No orders match this filter.</p>
+        )}
+
+        {visible.length > 0 && (
+        <div className="-mx-5 overflow-x-auto">
+          <table className="min-w-full border-collapse text-sm">
             <thead>
-              <tr className="text-left border-b">
-                <th className="p-2">Date</th>
-                <th className="p-2">Photo</th>
-                <th className="p-2">Owner</th>
-                <th className="p-2">Dog</th>
-                <th className="p-2">Email</th>
-                <th className="p-2">City/State</th>
-                <th className="p-2">Rescue</th>
-                <th className="p-2">Caption</th>
-                <th className="p-2">Stand option</th>
-                <th className="p-2">Nudges</th>
+              <tr className="border-y border-gray-200 bg-gray-50 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">
+                <th className="px-3 py-2">Date</th>
+                <th className="px-3 py-2">Photo</th>
+                <th className="px-3 py-2">Owner</th>
+                <th className="px-3 py-2">Dog</th>
+                <th className="px-3 py-2">Email</th>
+                <th className="px-3 py-2">City/State</th>
+                <th className="px-3 py-2">Rescue</th>
+                <th className="px-3 py-2">Caption</th>
+                <th className="px-3 py-2">Stand option</th>
+                <th className="px-3 py-2">Nudges</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-gray-200 text-gray-700">
               {visible.map(o => {
                 const duplicate = hasDuplicateDate(o, dupes)
                 const noPhoto = hasNoPhoto(o)
                 return (
                   <tr
                     key={o.id}
-                    className={`border-b align-top ${isFlagged(o, dupes) ? 'bg-yellow-50' : ''}`}
+                    className={`align-top ${
+                      isFlagged(o, dupes) ? 'bg-amber-50 hover:bg-amber-100' : 'hover:bg-gray-50'
+                    }`}
                   >
-                    <td className="p-2 whitespace-nowrap">
+                    <td className="whitespace-nowrap px-3 py-2 text-gray-900">
                       {formatCalendarDate(o.calendar_date)}
                       {duplicate && (
-                        <span className="block text-xs text-yellow-800">⚠ duplicate date</span>
+                        <span className="mt-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">
+                          ⚠ duplicate date
+                        </span>
                       )}
-                      {noPhoto && <span className="block text-xs text-yellow-800">⚠ no photo</span>}
+                      {noPhoto && (
+                        <span className="mt-1 inline-block rounded bg-amber-100 px-1.5 py-0.5 text-xs font-medium text-amber-800">
+                          ⚠ no photo
+                        </span>
+                      )}
                     </td>
-                    <td className="p-2">
+                    <td className="px-3 py-2">
                       {o.thumb_url ? (
                         o.image_url ? (
                           <a href={o.image_url} target="_blank" rel="noreferrer">
                             {/* eslint-disable-next-line @next/next/no-img-element */}
-                            <img src={o.thumb_url} alt={o.dog_name} width={48} height={48} />
+                            <img
+                              src={o.thumb_url}
+                              alt={o.dog_name}
+                              width={48}
+                              height={48}
+                              className="rounded ring-1 ring-gray-200"
+                            />
                           </a>
                         ) : (
                           // eslint-disable-next-line @next/next/no-img-element
-                          <img src={o.thumb_url} alt={o.dog_name} width={48} height={48} />
+                          <img
+                            src={o.thumb_url}
+                            alt={o.dog_name}
+                            width={48}
+                            height={48}
+                            className="rounded ring-1 ring-gray-200"
+                          />
                         )
                       ) : (
                         <span className="text-xs text-gray-500">—</span>
                       )}
                     </td>
-                    <td className="p-2">{o.owner_name}</td>
-                    <td className="p-2">{o.dog_name}</td>
-                    <td className="p-2 break-all">{o.email || '—'}</td>
-                    <td className="p-2 whitespace-nowrap">
+                    <td className="px-3 py-2 text-gray-700">{o.owner_name}</td>
+                    <td className="px-3 py-2 font-medium text-gray-900">{o.dog_name}</td>
+                    <td className="break-all px-3 py-2 text-gray-500">{o.email || '—'}</td>
+                    <td className="whitespace-nowrap px-3 py-2 text-gray-500">
                       {[o.city, o.state].filter(Boolean).join(', ')}
                     </td>
-                    <td className="p-2 text-center">{o.is_rescue ? '✓' : ''}</td>
-                    <td className="p-2 max-w-xs truncate" title={o.caption}>
+                    <td className="px-3 py-2 text-center text-gray-700">
+                      {o.is_rescue ? '✓' : ''}
+                    </td>
+                    <td className="max-w-xs truncate px-3 py-2 text-gray-500" title={o.caption}>
                       {o.caption}
                     </td>
-                    <td className="p-2 whitespace-nowrap">
+                    <td className="whitespace-nowrap px-3 py-2">
                       <select
                         value={o.stand_option ?? ''}
                         disabled={savingIds.has(o.id)}
                         onChange={e => void updateStand(o, e.target.value)}
-                        className="border rounded p-1 disabled:opacity-50"
+                        className="rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500 disabled:opacity-50"
                       >
                         <option value="">—</option>
                         {STAND_VALUES.map(v => (
@@ -296,12 +326,12 @@ export default function OrdersTable() {
                         ))}
                       </select>
                       {o.stand_option_source && (
-                        <span className="ml-1 text-xs text-gray-500">
+                        <span className="ml-1 inline-block rounded bg-gray-100 px-1.5 py-0.5 text-xs font-medium text-gray-600">
                           ({o.stand_option_source})
                         </span>
                       )}
                     </td>
-                    <td className="p-2 whitespace-nowrap">
+                    <td className="whitespace-nowrap px-3 py-2 text-gray-700">
                       {o.stand_emails_sent}
                       {o.stand_last_emailed_at && (
                         <span className="block text-xs text-gray-500">
@@ -315,7 +345,8 @@ export default function OrdersTable() {
             </tbody>
           </table>
         </div>
-      )}
+        )}
+      </div>
     </section>
   )
 }
