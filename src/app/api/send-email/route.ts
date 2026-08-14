@@ -1,19 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import nodemailer from 'nodemailer'
+import { getTransporter } from '@/lib/mailer'
 
 export async function POST(request: NextRequest) {
   try {
     const formData = await request.json()
 
-    const transporter = nodemailer.createTransport({
-      host: 'barcsebasset-a-daycalendar.org',
-      port: 587,
-      secure: false,
-      auth: {
-        user: process.env.EMAIL_USER,
-        pass: process.env.EMAIL_PASSWORD
-      }
-    })
+    // Shared transport: host/port/credentials come from env, not hardcoded literals.
+    const transporter = getTransporter()
 
     const mailOptions = {
       from: process.env.EMAIL_USER,
@@ -35,7 +28,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error sending email:', error)
+    // nodemailer puts the server's rejection text on `response` — log it, since the
+    // generic client-facing message below deliberately says nothing useful.
+    const response = (error as { response?: unknown })?.response
+    console.error('Error sending email:', error, response ? `SMTP response: ${response}` : '')
     return NextResponse.json(
       { error: 'Failed to send email' },
       { status: 500 }
