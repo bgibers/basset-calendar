@@ -464,7 +464,7 @@ export default function Home() {
                           className="ml-3 h-20 w-20 object-contain"
                         />
                         <span className="ml-3 text-sm text-gray-700 self-center">
-                          I have a black acrylic stand
+                          I have a black stand
                         </span>
                       </label>
 
@@ -481,7 +481,7 @@ export default function Home() {
                           className="ml-3 h-20 w-20 object-contain"
                         />
                         <span className="ml-3 text-sm text-gray-700 self-center">
-                          I have a clear acrylic calendar stand
+                          I have a clear stand
                         </span>
                       </label>
 
