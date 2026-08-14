@@ -8,8 +8,10 @@ import type { Order } from '@/lib/types'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 // Sends are sequential with a 500 ms pause, so a full 50-row batch needs ~25 s of wall
-// clock plus SMTP round trips. 60 s leaves headroom without risking a hung request.
-export const maxDuration = 60
+// clock plus up to 50 SMTP round trips, which alone can exceed a minute on a slow host.
+// A timeout mid-batch is duplicate-safe (rows are stamped as they send) but surfaces to
+// the admin as an error, so give the batch the full ceiling.
+export const maxDuration = 300
 
 /**
  * Rows still worth emailing *in this campaign*: no stand option recorded, an email address,
