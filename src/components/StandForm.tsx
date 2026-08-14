@@ -8,17 +8,17 @@ import type { StandOption } from '@/lib/types'
 const OPTIONS: { value: StandOption; label: string; image?: { src: string }; alt?: string }[] = [
   {
     value: 'have-black',
-    label: 'I have a black acrylic stand',
+    label: 'I have a black stand',
     image: standBlackImg,
     alt: 'Black acrylic calendar stand',
   },
   {
     value: 'have-clear',
-    label: 'I have a clear acrylic stand',
+    label: 'I have a clear stand',
     image: standClearImg,
     alt: 'Clear acrylic calendar stand',
   },
-  { value: 'ordered', label: 'I ordered a stand' },
+  { value: 'ordered', label: 'I ordered one' },
 ]
 
 export default function StandForm({

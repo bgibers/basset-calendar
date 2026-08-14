@@ -4,6 +4,7 @@ import { useMemo, useRef, useState } from 'react'
 import type { Order } from '@/lib/types'
 import {
   allEligibleAlreadyEmailed,
+  browserCampaignStampStorage,
   createCampaignTracker,
   isStandEmailEligible,
   runStandEmailCampaign,
@@ -11,6 +12,7 @@ import {
   STAND_EMAIL_SUBJECT,
   DEFAULT_BATCH_SIZE,
   type CampaignBatchResult,
+  type StandSkip,
 } from '@/lib/stand-email'
 
 function plural(n: number): string {
@@ -57,12 +59,14 @@ export default function StandEmailPanel({
   const [sentCount, setSentCount] = useState(0)
   const [total, setTotal] = useState(0)
   const [failures, setFailures] = useState<Failure[]>([])
+  const [skipped, setSkipped] = useState<StandSkip[]>([])
   const [status, setStatus] = useState('')
   const [showPreview, setShowPreview] = useState(false)
 
   // Survives re-renders so a retry after a failure continues the same campaign instead of
-  // re-emailing everyone the failed run already reached.
-  const campaign = useRef(createCampaignTracker())
+  // re-emailing everyone the failed run already reached. Backed by localStorage so a tab
+  // reload mid-campaign resumes it too, rather than minting a fresh stamp.
+  const campaign = useRef(createCampaignTracker(browserCampaignStampStorage()))
 
   const eligible = useMemo(() => orders.filter(isStandEmailEligible), [orders])
   const followUp = useMemo(() => allEligibleAlreadyEmailed(eligible), [eligible])
@@ -72,9 +76,13 @@ export default function StandEmailPanel({
   const preview = standEmailText(SAMPLE_ORDER, 'https://your-calendar-site')
 
   async function sendAll() {
+    // Two overlapping presses would share one campaign stamp and therefore select the very
+    // same rows, emailing them twice. One run at a time.
+    if (sending) return
     setConfirming(false)
     setSending(true)
     setFailures([])
+    setSkipped([])
     setStatus('')
     const target = eligible.length
     setTotal(target)
@@ -113,15 +121,24 @@ export default function StandEmailPanel({
       )
       campaign.current.settle(result.outcome)
       setFailures(result.failures)
+      setSkipped(result.skipped)
+      // Skips are not failures — nobody could ever have received these — but they must be
+      // visible, because the only fix is a human correcting the address on the order.
+      const skipNote =
+        result.skipped.length === 0
+          ? ''
+          : ` Skipped ${result.skipped.length} order${
+              result.skipped.length === 1 ? '' : 's'
+            } with unusable email addresses.`
       if (result.outcome === 'complete') {
-        setStatus(`Done — sent ${plural(result.sent)}.`)
+        setStatus(`Done — sent ${plural(result.sent)}.${skipNote}`)
       } else if (result.outcome === 'failures') {
         setStatus(
-          `Stopped after ${plural(result.sent)} because some sends failed. Fix the addresses below, then run it again — everyone already emailed is skipped.`,
+          `Stopped after ${plural(result.sent)} because some sends failed. Fix the addresses below, then run it again — everyone already emailed is skipped.${skipNote}`,
         )
       } else {
         setStatus(
-          `Stopped: ${result.remaining} recipient${result.remaining === 1 ? '' : 's'} remain but the last batch sent nothing.`,
+          `Stopped: ${result.remaining} recipient${result.remaining === 1 ? '' : 's'} remain but the last batch sent nothing.${skipNote}`,
         )
       }
     } catch (err) {
@@ -194,9 +211,10 @@ export default function StandEmailPanel({
             <button
               type="button"
               onClick={() => void sendAll()}
-              className="rounded bg-blue-600 px-3 py-1 text-white"
+              disabled={sending}
+              className="rounded bg-blue-600 px-3 py-1 text-white disabled:opacity-50"
             >
-              Yes, send now
+              {sending ? 'Sending…' : 'Yes, send now'}
             </button>
             <button
               type="button"
@@ -221,6 +239,25 @@ export default function StandEmailPanel({
       )}
 
       {status && <p className="text-sm text-gray-800">{status}</p>}
+
+      {skipped.length > 0 && (
+        <div className="rounded border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+          <p className="font-medium">
+            {skipped.length} order{skipped.length === 1 ? '' : 's'} skipped — the email address is
+            unusable, so nothing was sent:
+          </p>
+          <ul className="mt-1 list-disc pl-5">
+            {skipped.map((s, i) => (
+              <li key={`${s.ownerName}-${i}`} className="break-all">
+                {s.ownerName} — <span className="font-mono">{s.email.trim() || '(blank)'}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1 text-xs">
+            Fix the address on the order, then run this again to include them.
+          </p>
+        </div>
+      )}
 
       {failures.length > 0 && (
         <div className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800">

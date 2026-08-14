@@ -94,7 +94,7 @@ export async function POST(request: NextRequest) {
     const orders = (data ?? []) as Order[]
     const transporter = getTransporter()
 
-    const { sent, failures } = await sendStandBatch(orders, {
+    const { sent, failures, skipped } = await sendStandBatch(orders, {
       mailer: transporter,
       from: process.env.EMAIL_USER,
       baseUrl: process.env.APP_BASE_URL,
@@ -105,6 +105,17 @@ export async function POST(request: NextRequest) {
             stand_emails_sent: order.stand_emails_sent + 1,
             stand_last_emailed_at: new Date().toISOString(),
           })
+          .eq('id', order.id)
+        if (updateError) throw new Error(updateError.message)
+      },
+      // An address nobody can deliver to is stamped *at the campaign cutoff* and never
+      // counted as emailed: that drops it from this campaign's eligible set (so the batch
+      // loop can finish) while leaving it eligible for the next campaign, in case the
+      // address gets fixed in the meantime.
+      markSkipped: async order => {
+        const { error: updateError } = await supabase
+          .from('orders')
+          .update({ stand_last_emailed_at: campaignCutoff })
           .eq('id', order.id)
         if (updateError) throw new Error(updateError.message)
       },
@@ -120,7 +131,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Could not count remaining recipients' }, { status: 500 })
     }
 
-    return NextResponse.json({ sent, remaining: count ?? 0, failures })
+    return NextResponse.json({ sent, remaining: count ?? 0, failures, skipped })
   } catch (err) {
     // getSupabaseAdmin throws without Supabase env vars; getTransporter without SMTP ones.
     console.error('[send stand emails] send failed:', err)

@@ -4,6 +4,7 @@ import {
   standEmailText,
   clampBatchSize,
   createCampaignTracker,
+  CAMPAIGN_STAMP_STORAGE_KEY,
   isValidCampaignStart,
   runStandEmailCampaign,
   sendStandBatch,
@@ -166,7 +167,7 @@ describe('sendStandBatch', () => {
 
     expect(sent.map(s => s.to)).toEqual(['a@x.com', 'b@x.com'])
     expect(marked).toEqual(['a', 'b'])
-    expect(result).toEqual({ sent: 2, failures: [] })
+    expect(result).toEqual({ sent: 2, failures: [], skipped: [] })
     expect(sent[0].subject).toBe(STAND_EMAIL_SUBJECT)
     expect(sent[0].from).toBe('order@example.org')
     expect(sent[0].replyTo).toBe('barcsemail@gmail.com')
@@ -246,6 +247,7 @@ describe('sendStandBatch', () => {
     expect(await sendStandBatch([], { mailer, markSent: async () => {}, delay })).toEqual({
       sent: 0,
       failures: [],
+      skipped: [],
     })
     expect(delay).not.toHaveBeenCalled()
   })
@@ -296,7 +298,7 @@ describe('sendStandBatch delay bookkeeping', () => {
 })
 
 describe('sendStandBatch blank addresses', () => {
-  it('reports a whitespace-only address as a failure and never contacts SMTP for it', async () => {
+  it('skips a whitespace-only address, stamps it, and never contacts SMTP for it', async () => {
     const sends: string[] = []
     const mailer: StandMailer = {
       async sendMail(options) {
@@ -305,14 +307,49 @@ describe('sendStandBatch blank addresses', () => {
       },
     }
     const marked: string[] = []
+    const stamped: string[] = []
     const result = await sendStandBatch(
-      [order({ id: 'a', email: '   ' }), order({ id: 'b', email: 'b@x.com' })],
-      { mailer, markSent: async o => void marked.push(o.id), delay: async () => {} },
+      [order({ id: 'a', email: '   ', owner_name: 'Dana' }), order({ id: 'b', email: 'b@x.com' })],
+      {
+        mailer,
+        markSent: async o => void marked.push(o.id),
+        markSkipped: async o => void stamped.push(o.id),
+        delay: async () => {},
+      },
     )
     expect(sends).toEqual(['b@x.com'])
     expect(marked).toEqual(['b'])
+    // The blank row is stamped so it leaves the eligible set instead of heading every batch.
+    expect(stamped).toEqual(['a'])
     expect(result.sent).toBe(1)
-    expect(result.failures).toEqual([{ email: '   ', error: 'blank email address' }])
+    // A blank address is not a delivery failure — it is a row nobody can ever reach.
+    expect(result.failures).toEqual([])
+    expect(result.skipped).toEqual([{ email: '   ', ownerName: 'Dana' }])
+  })
+
+  it('reports a failure when the skip stamp cannot be written', async () => {
+    const mailer: StandMailer = { async sendMail() { return {} } }
+    const result = await sendStandBatch([order({ id: 'a', email: ' ', owner_name: 'Dana' })], {
+      mailer,
+      markSent: async () => {},
+      markSkipped: async () => {
+        throw new Error('permission denied')
+      },
+      delay: async () => {},
+    })
+    expect(result.sent).toBe(0)
+    expect(result.skipped).toEqual([{ email: ' ', ownerName: 'Dana' }])
+    expect(result.failures[0]!.error).toContain('permission denied')
+  })
+
+  it('still skips blank rows when no markSkipped hook is supplied', async () => {
+    const mailer: StandMailer = { async sendMail() { return {} } }
+    const result = await sendStandBatch([order({ id: 'a', email: '' })], {
+      mailer,
+      markSent: async () => {},
+      delay: async () => {},
+    })
+    expect(result).toEqual({ sent: 0, failures: [], skipped: [{ email: '', ownerName: 'Kim' }] })
   })
 })
 
@@ -361,6 +398,91 @@ describe('createCampaignTracker', () => {
   })
 })
 
+describe('createCampaignTracker persistence', () => {
+  const t1 = '2026-08-12T10:00:00.000Z'
+  const t2 = '2026-08-12T10:05:00.000Z'
+
+  /** Stands in for localStorage; a reload is modelled as a brand-new tracker over it. */
+  function fakeStorage(initial: Record<string, string> = {}) {
+    const map = new Map(Object.entries(initial))
+    return {
+      map,
+      get: (key: string) => map.get(key) ?? null,
+      set: (key: string, value: string) => void map.set(key, value),
+      remove: (key: string) => void map.delete(key),
+    }
+  }
+
+  it('carries an unfinished campaign across a reload', () => {
+    const storage = fakeStorage()
+    const before = createCampaignTracker(storage)
+    expect(before.current(t1)).toBe(t1)
+    expect(storage.get(CAMPAIGN_STAMP_STORAGE_KEY)).toBe(t1)
+
+    // The admin reloads the tab mid-campaign: fresh tracker, no in-memory stamp.
+    const after = createCampaignTracker(storage)
+    expect(after.pending()).toBe(t1)
+    expect(after.current(t2)).toBe(t1)
+  })
+
+  it('clears the stored stamp when a campaign completes', () => {
+    const storage = fakeStorage()
+    const tracker = createCampaignTracker(storage)
+    tracker.current(t1)
+    tracker.settle('complete')
+    expect(storage.get(CAMPAIGN_STAMP_STORAGE_KEY)).toBeNull()
+    // A reload after a completed campaign starts a genuinely new one — the follow-up.
+    expect(createCampaignTracker(storage).current(t2)).toBe(t2)
+  })
+
+  it('retains the stored stamp when a campaign ends in failures or stalls', () => {
+    for (const outcome of ['failures', 'stalled'] as const) {
+      const storage = fakeStorage()
+      const tracker = createCampaignTracker(storage)
+      tracker.current(t1)
+      tracker.settle(outcome)
+      expect(storage.get(CAMPAIGN_STAMP_STORAGE_KEY), outcome).toBe(t1)
+      expect(createCampaignTracker(storage).current(t2), outcome).toBe(t1)
+    }
+  })
+
+  it('ignores a malformed stored value and mints a fresh stamp', () => {
+    for (const junk of ['not-a-date', '', '   ', '{}']) {
+      const storage = fakeStorage({ [CAMPAIGN_STAMP_STORAGE_KEY]: junk })
+      const tracker = createCampaignTracker(storage)
+      expect(tracker.pending(), junk).toBeNull()
+      expect(tracker.current(t1), junk).toBe(t1)
+      expect(storage.get(CAMPAIGN_STAMP_STORAGE_KEY), junk).toBe(t1)
+    }
+  })
+
+  it('ignores a stored stamp from the future, which the server would reject anyway', () => {
+    const future = new Date(Date.now() + 10 * 60_000).toISOString()
+    const storage = fakeStorage({ [CAMPAIGN_STAMP_STORAGE_KEY]: future })
+    const now = new Date().toISOString()
+    expect(createCampaignTracker(storage).current(now)).toBe(now)
+  })
+
+  it('works without any storage, and survives a storage that throws', () => {
+    expect(createCampaignTracker().current(t1)).toBe(t1)
+    const hostile = {
+      get: () => {
+        throw new Error('SecurityError')
+      },
+      set: () => {
+        throw new Error('QuotaExceededError')
+      },
+      remove: () => {
+        throw new Error('SecurityError')
+      },
+    }
+    const tracker = createCampaignTracker(hostile)
+    expect(tracker.current(t1)).toBe(t1)
+    expect(tracker.current(t2)).toBe(t1)
+    expect(() => tracker.settle('complete')).not.toThrow()
+  })
+})
+
 describe('isValidCampaignStart', () => {
   const now = Date.parse('2026-08-12T10:00:00.000Z')
 
@@ -402,7 +524,7 @@ describe('runStandEmailCampaign', () => {
       },
       { campaignStartedAt, onProgress: n => void progress.push(n) },
     )
-    expect(result).toEqual({ sent: 55, remaining: 0, failures: [], outcome: 'complete' })
+    expect(result).toEqual({ sent: 55, remaining: 0, failures: [], skipped: [], outcome: 'complete' })
     expect(seen).toHaveLength(3)
     // Every batch carries the same campaign stamp — that is what makes it terminate.
     expect(seen.every(b => b.campaignStartedAt === campaignStartedAt)).toBe(true)
@@ -449,6 +571,42 @@ describe('runStandEmailCampaign', () => {
       { campaignStartedAt, batchSize: 1, maxBatches: 4 },
     )
     expect(calls).toBe(4)
+    expect(result.outcome).toBe('stalled')
+  })
+
+  it('completes a campaign whose batch contained an unreachable address', async () => {
+    // The blank-address row is stamped as it is skipped, so it leaves the eligible set and
+    // `remaining` can reach 0. Before the fix it reappeared in every batch forever.
+    const batches = [
+      { sent: 2, remaining: 0, failures: [], skipped: [{ email: '  ', ownerName: 'Dana' }] },
+    ]
+    const result = await runStandEmailCampaign(async () => batches.shift()!, {
+      campaignStartedAt,
+    })
+    expect(result.outcome).toBe('complete')
+    expect(result.sent).toBe(2)
+    expect(result.failures).toEqual([])
+    expect(result.skipped).toEqual([{ email: '  ', ownerName: 'Dana' }])
+  })
+
+  it('keeps looping when a batch only skipped rows, and gathers every skip', async () => {
+    const batches = [
+      { sent: 0, remaining: 2, failures: [], skipped: [{ email: ' ', ownerName: 'Dana' }] },
+      { sent: 2, remaining: 0, failures: [], skipped: [{ email: '', ownerName: 'Sam' }] },
+    ]
+    const result = await runStandEmailCampaign(async () => batches.shift()!, { campaignStartedAt })
+    expect(result.outcome).toBe('complete')
+    expect(result.skipped).toEqual([
+      { email: ' ', ownerName: 'Dana' },
+      { email: '', ownerName: 'Sam' },
+    ])
+  })
+
+  it('still stalls when a batch neither sent nor skipped anything', async () => {
+    const result = await runStandEmailCampaign(
+      async () => ({ sent: 0, remaining: 4, failures: [], skipped: [] }),
+      { campaignStartedAt },
+    )
     expect(result.outcome).toBe('stalled')
   })
 

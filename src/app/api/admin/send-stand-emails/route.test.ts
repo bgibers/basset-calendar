@@ -247,7 +247,7 @@ describe('POST /api/admin/send-stand-emails', () => {
     ]
     const res = await POST(req({ batchSize: 2, campaignStartedAt: CAMPAIGN }))
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ sent: 2, remaining: 1, failures: [] })
+    expect(await res.json()).toEqual({ sent: 2, remaining: 1, failures: [], skipped: [] })
     expect(sendMail.mock.calls.map(c => c[0].to)).toEqual(['a@x.com', 'b@x.com'])
     const first = sendMail.mock.calls[0]![0]
     expect(first.from).toBe('order@example.org')
@@ -285,16 +285,16 @@ describe('POST /api/admin/send-stand-emails', () => {
     ]
 
     const one = await POST(req({ batchSize: 1, campaignStartedAt: CAMPAIGN }))
-    expect(await one.json()).toEqual({ sent: 1, remaining: 1, failures: [] })
+    expect(await one.json()).toEqual({ sent: 1, remaining: 1, failures: [], skipped: [] })
 
     const two = await POST(req({ batchSize: 1, campaignStartedAt: CAMPAIGN }))
-    expect(await two.json()).toEqual({ sent: 1, remaining: 0, failures: [] })
+    expect(await two.json()).toEqual({ sent: 1, remaining: 0, failures: [], skipped: [] })
 
     // Two batches, two distinct recipients — nobody emailed twice, and remaining hit 0.
     expect(sendMail.mock.calls.map(c => c[0].to)).toEqual(['a@x.com', 'b@x.com'])
 
     const three = await POST(req({ batchSize: 1, campaignStartedAt: CAMPAIGN }))
-    expect(await three.json()).toEqual({ sent: 0, remaining: 0, failures: [] })
+    expect(await three.json()).toEqual({ sent: 0, remaining: 0, failures: [], skipped: [] })
     expect(sendMail).toHaveBeenCalledTimes(2)
   })
 
@@ -302,7 +302,7 @@ describe('POST /api/admin/send-stand-emails', () => {
     state.rows = [row({ id: 'a', email: 'a@x.com', stand_last_emailed_at: CAMPAIGN })]
     const later = new Date(Date.parse(CAMPAIGN) + 60 * 60_000).toISOString()
     const res = await POST(req({ batchSize: 5, campaignStartedAt: later }))
-    expect(await res.json()).toEqual({ sent: 1, remaining: 0, failures: [] })
+    expect(await res.json()).toEqual({ sent: 1, remaining: 0, failures: [], skipped: [] })
     expect(state.updates[0]!.values.stand_emails_sent).toBe(1)
   })
 
@@ -313,16 +313,42 @@ describe('POST /api/admin/send-stand-emails', () => {
       row({ id: 'c', email: '' }),
     ]
     const res = await POST(req({ batchSize: 50, campaignStartedAt: CAMPAIGN }))
-    expect(await res.json()).toEqual({ sent: 1, remaining: 0, failures: [] })
+    expect(await res.json()).toEqual({ sent: 1, remaining: 0, failures: [], skipped: [] })
     expect(sendMail.mock.calls.map(c => c[0].to)).toEqual(['a@x.com'])
   })
 
-  it('reports a whitespace-only address as a failure instead of sending to it', async () => {
-    state.rows = [row({ id: 'a', email: '   ' }), row({ id: 'b', email: 'b@x.com' })]
+  it('skips a whitespace-only address, stamps it out of the campaign, and finishes', async () => {
+    state.rows = [
+      row({ id: 'a', email: '   ', owner_name: 'Dana', calendar_date: '2027-01-01' }),
+      row({ id: 'b', email: 'b@x.com', calendar_date: '2027-01-02' }),
+    ]
     const res = await POST(req({ batchSize: 50, campaignStartedAt: CAMPAIGN }))
-    const body = (await res.json()) as { sent: number; failures: { email: string; error: string }[] }
+    const body = (await res.json()) as {
+      sent: number
+      remaining: number
+      failures: unknown[]
+      skipped: { email: string; ownerName: string }[]
+    }
+    expect(sendMail.mock.calls.map(c => c[0].to)).toEqual(['b@x.com'])
     expect(body.sent).toBe(1)
-    expect(body.failures).toEqual([{ email: '   ', error: 'blank email address' }])
+    // Not a failure: no retry can deliver to a blank address.
+    expect(body.failures).toEqual([])
+    expect(body.skipped).toEqual([{ email: '   ', ownerName: 'Dana' }])
+    // Stamped but never counted as emailed, so it drops out of the eligible set …
+    const stamp = state.updates.find(u => u.id === 'a')!
+    expect(stamp.values.stand_last_emailed_at).toBe(CAMPAIGN)
+    expect(stamp.values.stand_emails_sent).toBeUndefined()
+    // … which is what lets remaining reach 0 and the campaign complete.
+    expect(body.remaining).toBe(0)
+  })
+
+  it('does not re-offer a skipped blank-address row on the next batch of the campaign', async () => {
+    state.rows = [row({ id: 'a', email: '   ' }), row({ id: 'b', email: 'b@x.com' })]
+    await POST(req({ batchSize: 1, campaignStartedAt: CAMPAIGN }))
+    const second = await POST(req({ batchSize: 1, campaignStartedAt: CAMPAIGN }))
+    const body = (await second.json()) as { sent: number; remaining: number }
+    expect(body.sent).toBe(1)
+    expect(body.remaining).toBe(0)
     expect(sendMail.mock.calls.map(c => c[0].to)).toEqual(['b@x.com'])
   })
 
@@ -370,6 +396,7 @@ describe('POST /api/admin/send-stand-emails', () => {
       // b was not marked as emailed, so it is still eligible in this campaign.
       remaining: 1,
       failures: [{ email: 'b@x.com', error: '550 mailbox unavailable' }],
+      skipped: [],
     })
     expect(state.updates.map(u => u.id)).toEqual(['a'])
   })
