@@ -1,10 +1,8 @@
-import axios from 'axios'
-
 export interface DatesTaken {
   [key: string]: string[]
 }
 
-export interface FormData {
+export interface OrderFormData {
   ownerName: string
   city: string
   state: string
@@ -15,104 +13,48 @@ export interface FormData {
   standOption: 'have-black' | 'have-clear' | 'order' | ''
 }
 
-const STAND_OPTION_LABELS: Record<FormData['standOption'], string> = {
-  '': 'Not specified',
-  'have-black': 'Already has a black acrylic stand',
-  'have-clear': 'Already has a clear acrylic stand',
-  order: 'Ordering a stand'
-}
-
-const API_BASE_URL = 'https://www.barcsebasset-a-daycalendar.org/fs'
-
+/**
+ * The form's only backend is our own API now — the legacy PHP host is reached
+ * solely server-side (src/lib/legacy-upload.ts).
+ */
 export const httpService = {
-  months: [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ],
-
-  async getDatesTaken(year: string): Promise<DatesTaken> {
-    const datesTaken: DatesTaken = {}
-
-    const promises = this.months.map(async (month, index) => {
-      const monthIndex = index + 1
-      try {
-        const response = await axios.get<string[]>(`${API_BASE_URL}/datestaken`, {
-          params: { month, year }
-        })
-        datesTaken[monthIndex] = response.data
-      } catch (error) {
-        console.error(`Error fetching dates for ${month}:`, error)
-        datesTaken[monthIndex] = []
-      }
-    })
-
-    await Promise.all(promises)
-    return datesTaken
+  /** The currently-sold calendar year and its taken dates, both admin-controlled. */
+  async getDatesTaken(): Promise<{ year: string; datesTaken: DatesTaken }> {
+    const res = await fetch('/api/dates-taken')
+    if (!res.ok) throw new Error(`Failed to load dates (${res.status})`)
+    return res.json()
   },
 
-  async sendEmail(formData: FormData, date: Date): Promise<void> {
-    try {
-      const response = await fetch('/api/send-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ownerName: formData.ownerName,
-          city: formData.city,
-          state: formData.state,
-          email: formData.email,
-          dogName: formData.dogName,
-          isRescue: formData.isRescue,
-          standOption: formData.standOption,
-          standOptionLabel: STAND_OPTION_LABELS[formData.standOption],
-          caption: formData.caption,
-          date: date.toISOString()
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to send email')
-      }
-    } catch (error) {
-      console.error('Error sending email:', error)
-      throw error
-    }
-  },
-
-  async uploadToServer(
+  /**
+   * One call replaces the old uploadToServer + sendEmail pair. Sends local date
+   * parts (year/month/day), never an ISO string — UTC conversion would shift
+   * US-timezone dates to the previous day. Throws on failure.
+   */
+  async submitOrder(
     file: File,
-    formData: FormData,
-    date: Date
+    formData: OrderFormData,
+    date: Date,
+    isFreeClaim: boolean,
   ): Promise<void> {
-    console.log('uploading to server')
-    const uploadData = new FormData()
-    uploadData.append('ownerName', formData.ownerName)
-    uploadData.append('city', formData.city)
-    uploadData.append('state', formData.state)
-    uploadData.append('email', formData.email)
-    uploadData.append('dogName', formData.dogName)
-    uploadData.append('isRescue', formData.isRescue.toString())
-    uploadData.append('needCalendarStand', (formData.standOption === 'order').toString())
-    uploadData.append('standOption', formData.standOption)
-    uploadData.append('caption', formData.caption)
-    uploadData.append('image', file)
+    const body = new FormData()
+    body.append('ownerName', formData.ownerName)
+    body.append('city', formData.city)
+    body.append('state', formData.state)
+    body.append('email', formData.email)
+    body.append('dogName', formData.dogName)
+    body.append('isRescue', String(formData.isRescue))
+    body.append('caption', formData.caption)
+    body.append('standOption', formData.standOption)
+    body.append('isFreeClaim', String(isFreeClaim))
+    body.append('year', String(date.getFullYear()))
+    body.append('month', String(date.getMonth() + 1))
+    body.append('day', String(date.getDate()))
+    body.append('image', file)
 
-    const params = {
-      month: this.months[date.getMonth()],
-      year: date.getFullYear().toString(),
-      date: date.getDate().toString()
+    const res = await fetch('/api/orders', { method: 'POST', body })
+    if (!res.ok) {
+      const payload = await res.json().catch(() => null)
+      throw new Error(payload?.error ?? `Order submission failed (${res.status})`)
     }
-
-    try {
-      await axios.post(`${API_BASE_URL}/upload`, uploadData, {
-        params,
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      })
-    } catch (error) {
-      console.error('Error uploading to server:', error)
-    }
-  }
+  },
 }

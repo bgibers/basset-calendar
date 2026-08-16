@@ -42,10 +42,12 @@ export default function Home() {
 
   const isSandbox = process.env.NEXT_PUBLIC_SANDBOX === "true"
 
-  const currentYear = new Date().getFullYear()
-  const yearForSelecting = (currentYear + 1).toString()
-  const minDate = new Date(currentYear + 1, 0, 1)
-  const maxDate = new Date(currentYear + 1, 11, 31)
+  // Admin-set selling year from /api/dates-taken; fallback matches the old
+  // currentYear+1 behavior until the first load completes.
+  const [sellingYear, setSellingYear] = useState<number>(new Date().getFullYear() + 1)
+  const yearForSelecting = sellingYear.toString()
+  const minDate = new Date(sellingYear, 0, 1)
+  const maxDate = new Date(sellingYear, 11, 31)
 
   const PAYPAL_PRODUCTION_CLIENT_ID = "AeVrUujAwn-me2pUdRlPANmADsETUI9qAZYkd9WIBvovYyoPTH2SnCG_DA8qyIefRBJg2mBdOZpDuGSV"
   const PAYPAL_SANDBOX_CLIENT_ID = "AWIRhPJA4dZ-YEcXmgBNJxTlWLZy06zPw3rqhgboXPC5Gc-lOCt_uvktXPyLoQbb-jcNOaHt0ITWTinV"
@@ -82,8 +84,9 @@ export default function Home() {
   const loadDatesTaken = async () => {
     setLoading(true)
     try {
-      const dates = await httpService.getDatesTaken(yearForSelecting)
-      setDatesTaken(dates)
+      const { year, datesTaken } = await httpService.getDatesTaken()
+      setSellingYear(Number(year))
+      setDatesTaken(datesTaken)
     } catch (error) {
       console.error('Error loading dates:', error)
     } finally {
@@ -152,7 +155,7 @@ export default function Home() {
       }
 
       if (fileValue && selectedDate) {
-        await httpService.uploadToServer(fileValue, formData, selectedDate)
+        await httpService.submitOrder(fileValue, formData, selectedDate, true)
         await loadDatesTaken()
         setPostCheckout(true)
         setFreeClaimEligible(false)
@@ -183,9 +186,8 @@ export default function Home() {
       }
 
       if (fileValue && selectedDate) {
-        await httpService.uploadToServer(fileValue, formData, selectedDate)
+        await httpService.submitOrder(fileValue, formData, selectedDate, false)
         await loadDatesTaken()
-        await httpService.sendEmail(formData, selectedDate)
         setPostCheckout(true)
         setCheckout(false)
         setPostCheckoutText('Thank you for your order!')
