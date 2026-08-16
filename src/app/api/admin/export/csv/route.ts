@@ -19,7 +19,15 @@ export async function GET(request: NextRequest) {
   }
   if (!admin) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
-  const year = request.nextUrl.searchParams.get('year') ?? (await getCurrentYear())
+  let year: string
+  try {
+    // getCurrentYear reaches getSupabaseAdmin, which throws when SUPABASE_URL /
+    // SUPABASE_SERVICE_ROLE_KEY are unset; keep the route's own log + JSON shape.
+    year = request.nextUrl.searchParams.get('year') ?? (await getCurrentYear())
+  } catch (err) {
+    console.error('[admin export csv] database unavailable:', err)
+    return NextResponse.json({ error: 'Database unavailable' }, { status: 500 })
+  }
   if (!/^\d{4}$/.test(year)) {
     return NextResponse.json({ error: 'invalid year' }, { status: 400 })
   }
