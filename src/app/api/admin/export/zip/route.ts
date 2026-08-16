@@ -6,6 +6,7 @@ import { isAdminRequest } from '@/lib/admin-auth'
 import { MONTHS } from '@/lib/months'
 import type { Order } from '@/lib/types'
 import { extensionFromUrl, zipEntryName } from '@/lib/zip-names'
+import { getCurrentYear } from '@/lib/settings'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -30,7 +31,7 @@ export async function GET(request: NextRequest) {
   }
   if (!admin) return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
 
-  const year = request.nextUrl.searchParams.get('year') ?? '2027'
+  const year = request.nextUrl.searchParams.get('year') ?? (await getCurrentYear())
   if (!/^\d{4}$/.test(year)) {
     return NextResponse.json({ error: 'invalid year' }, { status: 400 })
   }
