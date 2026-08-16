@@ -53,3 +53,4 @@ Thumbs.db
 
 # private SSH key for cPanel host — never commit
 key_rsa
+SERVER-ACCESS.md
