@@ -1,4 +1,5 @@
 import { MONTHS } from '@/lib/months'
+import { extensionForMime } from '@/lib/order-submit'
 
 // The legacy cPanel host has no SLA. Without a cap, a host that accepts the
 // connection but never answers would hold the request until the orders route's
@@ -29,7 +30,9 @@ export async function uploadPhotoToLegacy(
 
   const body = new FormData()
   for (const [key, value] of Object.entries(fields)) body.append(key, value)
-  body.append('image', file)
+  // The legacy app saves the upload under its client-supplied filename verbatim,
+  // so normalize it here — legacyImageUrl() predicts exactly this name.
+  body.append('image', file, `photo${extensionForMime(file.type)}`)
 
   const params = new URLSearchParams({ month, year, date: day })
   const res = await fetch(`${base}/upload?${params}`, {
