@@ -106,6 +106,22 @@ describe('toOrderRow', () => {
       thumb_url: null,
     })
   })
+
+  it.each(['have-black', 'have-clear'] as const)(
+    'passes %s through unchanged, still sourced from the customer',
+    option => {
+      const owned = (
+        parseSubmission({ ...valid, standOption: option }, '2028') as {
+          ok: true
+          value: never
+        }
+      ).value
+      expect(toOrderRow(owned, null)).toMatchObject({
+        stand_option: option,
+        stand_option_source: 'customer',
+      })
+    },
+  )
 })
 
 describe('legacyImageUrl / extensionForMime', () => {
