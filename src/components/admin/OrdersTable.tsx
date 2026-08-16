@@ -15,14 +15,17 @@ import {
 } from '@/lib/order-flags'
 import { createLatestOnly } from '@/lib/latest-request'
 import { MONTHS } from '@/lib/months'
+import { yearWindow } from '@/lib/year'
 import StandEmailPanel from '@/components/admin/StandEmailPanel'
 
 const FILTERS: OrderFilter[] = ['all', 'missing-stand', 'no-email', 'flagged']
-const YEARS = [2026, 2027, 2028]
 const STAND_VALUES = Object.keys(STAND_LABELS) as StandOption[]
 
 export default function OrdersTable() {
-  const [year, setYear] = useState(2027)
+  // null until /api/admin/settings answers; the orders load waits for it so the
+  // table always opens on the admin-configured year.
+  const [year, setYear] = useState<number | null>(null)
+  const [yearOptions, setYearOptions] = useState<number[]>([])
   const [orders, setOrders] = useState<Order[]>([])
   const [filter, setFilter] = useState<OrderFilter>('all')
   const [loading, setLoading] = useState(true)
@@ -58,7 +61,26 @@ export default function OrdersTable() {
   }, [])
 
   useEffect(() => {
-    void load(year)
+    let cancelled = false
+    fetch('/api/admin/settings')
+      .then(res => (res.ok ? res.json() : null))
+      .catch(() => null)
+      .then(body => {
+        if (cancelled) return
+        const current = Number(body?.current_year)
+        // Settings unreachable: fall back to next wall-clock year rather than a
+        // dead dashboard.
+        const resolved = Number.isInteger(current) ? current : new Date().getFullYear() + 1
+        setYearOptions(yearWindow(resolved))
+        setYear(resolved)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (year !== null) void load(year)
   }, [load, year])
 
   // Abort any request still in flight when the table unmounts.
@@ -128,17 +150,25 @@ export default function OrdersTable() {
     }
   }
 
+  if (year === null) {
+    return (
+      <section className="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+        <p className="py-12 text-center text-gray-500">Loading settings…</p>
+      </section>
+    )
+  }
+
   return (
     <section className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-5 py-4 shadow-sm">
         <label className="text-sm font-medium text-gray-700">
           Year{' '}
           <select
-            value={year}
+            value={year ?? ''}
             onChange={e => setYear(Number(e.target.value))}
             className="ml-1 rounded-md border border-gray-300 bg-white px-2 py-1 text-sm text-gray-900 shadow-sm focus:border-red-500 focus:outline-none focus:ring-1 focus:ring-red-500"
           >
-            {YEARS.map(y => (
+            {yearOptions.map(y => (
               <option key={y} value={y}>
                 {y}
               </option>
@@ -282,6 +312,7 @@ export default function OrdersTable() {
                               alt={o.dog_name}
                               width={48}
                               height={48}
+                              loading="lazy"
                               className="rounded ring-1 ring-gray-200"
                             />
                           </a>
@@ -292,6 +323,7 @@ export default function OrdersTable() {
                             alt={o.dog_name}
                             width={48}
                             height={48}
+                            loading="lazy"
                             className="rounded ring-1 ring-gray-200"
                           />
                         )

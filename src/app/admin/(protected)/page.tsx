@@ -1,4 +1,5 @@
 import OrdersTable from '@/components/admin/OrdersTable'
+import SettingsCard from '@/components/admin/SettingsCard'
 
 export default function AdminDashboard() {
   return (
@@ -12,6 +13,8 @@ export default function AdminDashboard() {
             Review orders, spot data problems, and record each dog&apos;s stand option.
           </p>
         </header>
+
+        <SettingsCard />
 
         {/* Export and stand-request email controls live inside OrdersTable so they follow
             the selected year. */}
